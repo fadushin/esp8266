@@ -23,44 +23,30 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
+import utcp_server
+import util
 
-import machine
-
-
-def starts_with(str_, prefix) :
-    return str_.find(prefix) == 0
-
-def module_to_dict(mod) :
-    ret = {}
-    for i in dir(mod) :
-        if not starts_with(i, '__') :
-            ret[i] = getattr(mod, i)
-    return ret
-
-def merge_dict(a, b) :
-    ret = a.copy()
-    ret.update(b)
-    return ret
-
-def set_datetime(year, month, day, hour=0, minute=0, second=0) :
-    rtc = machine.RTC()
-    rtc.datetime((year, month, day, hour, minute, second, 0, 0))
-
-def print_module(module) :
-    f = open(module + '.py')
-    print("%s" % f.read())
+class Server :
     
-def datetimestr() :
-    import time
-    (year, month, day, hour, minute, second, millis, _tzinfo) = time.localtime()
-    return "%d-%02d-%02dT%02d:%02d:%02d.%03d" % (year, month, day, hour, minute, second, millis)
+    def __init__(self, port) :
+        self._port = port
+        self._tcp_server = utcp_server.Server(port, self)
+    
+    def start(self) :
+        self._tcp_server.start()
 
-def set_led_error(pin_id=14) :
-    import machine
-    pin = machine.Pin(pin_id, machine.Pin.OUT)
-    pin.high()
+    ##
+    ## callbacks
+    ##
+    
+    def handle_request(self, client_socket) :
+        f = client_socket.makefile('rwb')
+        line = f.readline()
+        data = line.decode('UTF-8')
+        if data.startswith(".") :
+            return (True, b'')
+        else :
+            return (False, buf)
+    
 
-def clear_led_error(pin_id=14) :
-    import machine
-    pin = machine.Pin(pin_id, machine.Pin.OUT)
-    pin.low()
+#server = Server(44444)

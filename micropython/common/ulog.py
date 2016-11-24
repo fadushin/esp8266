@@ -24,7 +24,6 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
 import socket
-import util
 
 class Log :
     '''
@@ -70,7 +69,7 @@ class Log :
         return "%d-%02d-%02dT%02d:%02d:%02d.%03d" % (year, month, day, hour, minute, second, millis)
         
     def _format(self, level, format_str, args) :
-        return "%s [%s]: " % (util.datetimestr(), level) + format_str % args
+        return "%s [%s]: " % (self.datetimestr(), level) + format_str % args
     
     def _log(self, level, format_str, args = ()) :
         if level in self._levels :
@@ -107,15 +106,47 @@ class Log :
         }
         try :
             import log_config
-            return util.merge_dict(
-                defaults, util.module_to_dict(log_config)
+            return self.merge_dict(
+                defaults, self.module_to_dict(log_config)
             )
         except Exception as E :
-            print(self._format(self.ERROR, "Error loading log_config: %s", E))
+            #print(self._format(self.ERROR, "Error loading log_config: %s", E))
             return defaults
         
+    def module_to_dict(self, mod) :
+        ret = {}
+        for i in dir(mod) :
+            if not i.startswith('__') :
+                ret[i] = getattr(mod, i)
+        return ret
+
+    def merge_dict(self, a, b) :
+        ret = a.copy()
+        ret.update(b)
+        return ret
+
+    def datetimestr(self) :
+        import time
+        (year, month, day, hour, minute, second, millis, _tzinfo) = time.localtime()
+        return "%d-%02d-%02dT%02d:%02d:%02d.%03d" % (year, month, day, hour, minute, second, millis)
             
 logger = Log()
+
+def debug(format_str, args = ()) :
+    '''Send a debug log message'''
+    logger.debug(format_str, args)
+
+def info(format_str, args = ()) :
+    '''Send an info log message'''
+    logger.info(format_str, args)
+
+def warning(format_str, args = ()) :
+    '''Send a warning log message'''
+    logger.warning(format_str, args)
+
+def error(format_str, args = ()) :
+    '''Send an error log message'''
+    logger.error(format_str, args)
 
 def test(ub=10) :
     for i in range(0, ub):

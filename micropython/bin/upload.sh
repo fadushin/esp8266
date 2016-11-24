@@ -17,5 +17,5 @@ fi
 WEBREPL_ROOT=/Volumes/case-sensitive/webrepl
 
 for i in ${FILES}; do 
-    ${WEBREPL_ROOT}/webrepl_cli.py $i ${IP_ADDRESS}:/$i
+    ${WEBREPL_ROOT}/webrepl_cli.py $i ${IP_ADDRESS}:/$(basename $i)
 done
