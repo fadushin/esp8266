@@ -23,7 +23,8 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
-import socket
+
+import sys
 
 class Log :
     '''
@@ -35,102 +36,103 @@ class Log :
     WARNING     = 'warning'
     ERROR       = 'error'
     
-    def __init__(self, debug=False) :
+    def __init__(self, config, name = "unknown") :
         '''Constructor'''
-        config = self._get_config()
-        self._host = config['host']
-        self._port = int(config['port'])
+        self._sinks = self.load_sinks(config)
         self._levels = config['levels']
-        self._debug = debug
-    
+        self._name = config['name']
+        
     def debug(self, format_str, args = ()) :
         '''Send a debug log message'''
-        self._log(self.DEBUG, format_str, args)
+        self.log(self.DEBUG, format_str, args)
 
     def info(self, format_str, args = ()) :
         '''Send an info log message'''
-        self._log(self.INFO, format_str, args)
+        self.log(self.INFO, format_str, args)
 
     def warning(self, format_str, args = ()) :
         '''Send a warning log message'''
-        self._log(self.WARNING, format_str, args)
+        self.log(self.WARNING, format_str, args)
 
     def error(self, format_str, args = ()) :
         '''Send an error log message'''
-        self._log(self.ERROR, format_str, args)
+        self.log(self.ERROR, format_str, args)
     
     ##
     ## internal operations
     ##
     
-    def _get_time(self) :
-        import time
-        (year, month, day, hour, minute, second, millis, _tzinfo) = time.localtime()
-        return "%d-%02d-%02dT%02d:%02d:%02d.%03d" % (year, month, day, hour, minute, second, millis)
-        
-    def _format(self, level, format_str, args) :
-        return "%s [%s]: " % (self.datetimestr(), level) + format_str % args
-    
-    def _log(self, level, format_str, args = ()) :
-        if level in self._levels :
-            message = self._format(level, format_str, args)
-            print(message)
-            if self._host :
-                self._send(message)
-    
-    def _get_connection(self) :
-        addr_info = socket.getaddrinfo(self._host, self._port)
-        addr = addr_info[0][-1]
-        s = socket.socket()
-        s.connect(addr)
-        return s
-    
-    def _send(self, message) :
-        try :
-            connection = self._get_connection()
-            connection.send(message)
-            connection.close()
-        except Exception as E :
-            if self._debug :
-                print(
-                    self._format(
-                        self.ERROR, "An error occurred sending a log message to %s%d: %s", (self._host, self._port, E)
-                    )
-                )
-
-    def _get_config(self) :
-        defaults = {
-            'levels': [self.INFO, self.WARNING, self.ERROR],
-            'host': None,
-            'port': 0
+    def load_sinks(self, config) :
+        if 'sinks' in config :
+            ret = {}
+            sink_configs = config['sinks']
+            for name, config in sink_configs.items() :
+                try :
+                    sink_name = name + "_sink"
+                    mod = __import__(sink_name)
+                    ret[name] = mod.Sink(config)
+                    print("loaded sink {}".format(name))
+                except Exception as e :
+                    print("Error: failed to load sink {} with config {}.  Error: {}".format(name, config, e))
+                    sys.print_exception(e)
+            return ret
+        else :
+            return {}
+            
+    def create(self, level, format_str, args) :
+        return {
+            'name': self._name,
+            'datetime': self.datetimestr(),
+            'level': level,
+            'message': format_str % args
         }
+    
+    def log(self, level, format_str, args = ()) :
+        if level in self._levels :
+            message = self.create(level, format_str, args)
+            for name, sink in self._sinks.items() :
+                self.do_log(sink, message)
+    
+    def do_log(self, sink, message) :
         try :
-            import log_config
-            return self.merge_dict(
-                defaults, self.module_to_dict(log_config)
-            )
-        except Exception as E :
-            #print(self._format(self.ERROR, "Error loading log_config: %s", E))
-            return defaults
-        
-    def module_to_dict(self, mod) :
-        ret = {}
-        for i in dir(mod) :
-            if not i.startswith('__') :
-                ret[i] = getattr(mod, i)
-        return ret
-
-    def merge_dict(self, a, b) :
-        ret = a.copy()
-        ret.update(b)
-        return ret
+            sink.log(message)
+        except Exception as e :
+            sys.print_exception(e)
 
     def datetimestr(self) :
         import time
         (year, month, day, hour, minute, second, millis, _tzinfo) = time.localtime()
         return "%d-%02d-%02dT%02d:%02d:%02d.%03d" % (year, month, day, hour, minute, second, millis)
             
-logger = Log()
+
+def module_to_dict(mod) :
+    ret = {}
+    for i in dir(mod) :
+        if not i.startswith('__') :
+            ret[i] = getattr(mod, i)
+    return ret
+
+def merge_dict(a, b) :
+    ret = a.copy()
+    ret.update(b)
+    return ret
+
+def get_config() :
+    defaults = {
+        'name': "esp8266",
+        'levels': [Log.INFO, Log.WARNING, Log.ERROR],
+        'sinks': {'console': None}
+    }
+    try :
+        import log_config
+        return merge_dict(
+            defaults, module_to_dict(log_config)
+        )
+    except Exception as e :
+        print(e)
+        return defaults
+
+logger = Log(get_config())
 
 def debug(format_str, args = ()) :
     '''Send a debug log message'''
