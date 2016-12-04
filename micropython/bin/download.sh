@@ -12,8 +12,11 @@ FILE=$1
 shift
 
 
-WEBREPL_ROOT=/Volumes/case-sensitive/webrepl
+if [ ! $(which webrepl_cli.py) ] ; then
+    echo "Adding /Volumes/case-sensitive/webrepl to PATH"
+    PATH=/Volumes/case-sensitive/webrepl:$PATH
+fi
 
 for i in ${FILE}; do 
-    ${WEBREPL_ROOT}/webrepl_cli.py ${IP_ADDRESS}:/$i $i-download
+    webrepl_cli.py ${IP_ADDRESS}:/$i $i-download
 done

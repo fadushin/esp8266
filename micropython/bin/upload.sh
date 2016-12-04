@@ -14,8 +14,11 @@ if [ ${NARGS} -gt 1 ] ; then
     FILES=$@
 fi
 
-WEBREPL_ROOT=/Volumes/case-sensitive/webrepl
+if [ ! $(which webrepl_cli.py) ] ; then
+    echo "Adding /Volumes/case-sensitive/webrepl to PATH"
+    PATH=/Volumes/case-sensitive/webrepl:$PATH
+fi
 
 for i in ${FILES}; do 
-    ${WEBREPL_ROOT}/webrepl_cli.py $i ${IP_ADDRESS}:/$(basename $i)
+    webrepl_cli.py $i ${IP_ADDRESS}:/$(basename $i)
 done

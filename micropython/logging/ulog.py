@@ -129,7 +129,6 @@ def get_config() :
             defaults, module_to_dict(log_config)
         )
     except Exception as e :
-        print(e)
         return defaults
 
 logger = Log(get_config())

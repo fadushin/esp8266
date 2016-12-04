@@ -1,12 +1,12 @@
 # Micropython HTTP daemon
 
-This set of modules provides a simple HTTP framework and server, providing an HTTP interface into your ESP8266.  Having an HTTP server allows developers to create management consoles into their ESP8266 devices, which can be very useful for configuration and troubleshooting devices, or even for bootstrapping them from an initial state.
+This set of modules provides a simple HTTP framework and server, providing an HTTP interface into your ESP8266.  Having an HTTP server allows developers to create management consoles for their ESP8266 devices, which can be very useful for configuration and troubleshooting devices, or even for bootstrapping them from an initial state.
 
-By itself, the `uhttpd` module is just a TCP server and framework for adding handlers to process HTTP requests.  The actual servicing of HTTP requests is done by installing handlers, which are configured in the `uhttpd` server.  It's the handlers that actually do the heavy lifting when it comes to servicing HTTP requests.  
+By itself, the `uhttpd` module is just a TCP server and framework for adding handlers to process HTTP requests.  The actual servicing of HTTP requests is done by installing handlers, which are passed to the `uhttpd` server at creation time.  It's the handlers that actually do the heavy lifting when it comes to servicing HTTP requests.  
 
 This package includes handlers for servicing files on the micropython file system (e.g., HTML, Javascript, CSS, etc), as well as handlers for managing REST-ful API calls, essential components in any modern web-based application.
  
-A driving design goal of this package is to have minimal impact on the ESP8266 device, itself, and to provide the tools that allow developers to implement rich client-side applications.  Be design, web applications built with this framework should do as little work as possible on the server side, but should instead make use of modern web technologies to allow the web client or browser to perform significant parts of business logic.  In most cases, the web clients will have far more memory and compute resources than the ESP8266 device, itself, so it is wise to keep as much logic as possible on the client side.
+A driving design goal of this package is to have minimal impact on the ESP8266 device, itself, and to provide the tools that allow developers to implement rich client-side applications.  By design, web applications built with this framework should do as little work as possible on the server side, but should instead make use of modern web technologies to allow the web client or browser to perform significant parts of business logic.  In most cases, the web clients will have far more memory and compute resources than the ESP8266 device, itself, so it is wise to keep as much logic as possible on the client side.
 
 > Warning: This software provides _no security_ for your applications.  When this software is running, any machine on your network may connect to your ESP8266 and browse the parts of the file system you expose through configuration, including possibly sensitive security credentials stored in plain text.  AS WRITTEN, THIS SOFTWARE IS NOT INTENDED FOR USE IN AN UNTRUSTED NETWORK!
 
@@ -18,17 +18,17 @@ The `uhttpd` framework and server is comprised the following python modules:
 * `utcp_server.py` -- provides basic TCP networking layer of abstraction
 * `http_file_handler.py` -- a file handler for the `uhttpd` server
 * `http_api_handler.py` -- a handler for servicing REST-ful APIs
-* `stats_api_handler` -- a handler instance used to service run-time statistics about the device
+* `stats_api_handler` -- an APU handler used to service run-time statistics about the device
 
-This module relies on the `ulog.py` facility, defined in the [logging](/micropython/logging) area of this repository.
+This module relies on the `ulog` facility, defined in the [logging](/micropython/logging) area of this repository.
 
 There is currently no `upip` support for this package.
 
 ## Loading Modules
 
-Some of the modules in this package require significant amounts of RAM to load and run.  While you can run these modules by loading them on the Micropython file system and allowing the runtime to compile the source modules for you, it is recommended to either burn the modules into your formware (a rather involved process, and recommended for production), or to compile to bytcode and load the generated `.mpy` files (recommended for development), which will decrease the memory footprint of your application using these modules.  You can acquire `mpy-cross` tool which will compile micro python source modules to bytecode, by installing and building the micro python source project, as described [here](https://github.com/micropython/micropython/tree/master/esp8266)
+Some of the modules in this package require significant amounts of RAM to load and run.  While you can run these modules by loading them on the Micropython file system and allowing the runtime to compile the source modules for you, it is recommended to either freeze the modules in your firmware (a rather involved process, and recommended for production), or to compile to bytcode and load the generated `.mpy` files (recommended for development), which will decrease the memory footprint of your application using these modules.  You can acquire the `mpy-cross` tool which will compile micro python source modules to bytecode, by installing and building the micro python source project, as described [here](https://github.com/micropython/micropython/tree/master/esp8266)
 
-This package includes a `make` file (`Makefile`), which you can use to generate `.mpy` files.  Loading the generated bytecode files, instead of the python files, will reduce memory overhead during the development process.
+Once you have the `mpy-cross` tool built, you can use the supplied `Makefile` to generate `.mpy` files.  Loading the generated bytecode files, instead of the python files, will reduce memory overhead during the development process of your application.
 
 > Note.  The Makefile assumes the presence of `mpy-cross` in your executable path.
 
@@ -50,7 +50,9 @@ For example, to build the bytecode,
 If you have `webrepl` running and `webrepl_cli.py` in your `PATH`, then you can upload the files you need to your device (adjusted of course for the IP address of your ESP8266), as follows:
 
     prompt$ export PATH=/Volumes/case-sensitive/webrepl:$PATH
-    prompt$ for i in logging/*.mpy daemons/*.mpy; do webrepl_cli.py $i 192.168.1.180:.; done
+    prompt$ bin/upload.sh 192.1681.180 logging/*.mpy daemons/*.mpy
+
+The above command will use the `webrepl_cli.py` tool to upload the needed files to your ESP8266, using the `webrepl` server.
 
 ## Basic Usage
 
@@ -72,7 +74,7 @@ For example, to start the server with the file handler rooted off the `/www` pat
 
     >>> import uhttpd
     >>> import http_file_handler
-    >>> server = uhttpd.Server([('/', http_file_handler.Handler())])
+    >>> server = uhttpd.Server([('/', http_file_handler.Handler('/www'))])
     >>> server.start()
 
 You should then see some logs printed to the console, indicating that the server is listening for connections:
@@ -112,7 +114,7 @@ For example, given the following construction:
         ])
     >>> server.start()
 
-a request of the form `http://host/foo/bar/` will be handled by `handler1`, whereas a request of the form `http://host/gant/` will be handled by `handler3`.
+a request of the form `http://host/foo/bar/` will be handled by `handler1`, whereas a request of the form `http://host/gnat/` will be handled by `handler3`.
 
 You may optionally specify a port at construction time.  The default is 80.
 
@@ -124,7 +126,7 @@ A `uhttpd.Server` may be stopped via the `stop` method.
 
 The `http_file_handler.Handler` request handler is designed to service files on the ESP8266 file system, relative to a specified file system root path (e.g., `/www`).
 
-This handler will display the contents of the path specified in the HTTP GET URL, relative to the specified root path.  If path refers to a file on the file system, the file contents are removed.  If the path refers to a directory, and the directory does not contain an `index.html` file, the directory contents are provided as a sequence of hyperlinks.  Otherwise, the request will result in a 404/Not Found HTTP error.
+This handler will display the contents of the path specified in the HTTP GET URL, relative to the specified root path.  If path refers to a file on the file system, the file contents are returned.  If the path refers to a directory, and the directory does not contain an `index.html` file, the directory contents are provided as a list of hyperlinks.  Otherwise, the request will result in a 404/Not Found HTTP error.
 
 The default root path for the `http_file_handler.Handler` is `/www`.  For example, the following constructor will result in a file handler that expects HTTP artifacts to reside in the `/www` directory of the micropython file system:
 
@@ -138,17 +140,15 @@ Once your handler is created, you can then provide it to the `uhttpd.Server` con
             ('/', file_handler)
         ])
 
-> Important: The path prefix provided to the `uhttpd.Server` constructor is distinct from the root path provided to the `http_file_handler.Handler` constructor.  The former is used only to pick out the handler to process the handler.  The latter is used to locate where, on the file system, to start looking for files and directories to serve.  If the root path is `/www` and the path in the HTTP request is `/foo/bar`, then the `http_file_handler.Handler` will look for `/www/foo/bar` on teh micropython file system.
+> Important: The path prefix provided to the `uhttpd.Server` constructor is distinct from the root path provided to the `http_file_handler.Handler` constructor.  The former relates to the path specified in a given HTTP GET request and is used to pick out the handler to process the handler.  The latter is used to locate where, on the file system, to start looking for files and directories to serve.  If the root path is `/www` and the path in the HTTP request is `/foo/bar`, then the `http_file_handler.Handler` will look for `/www/foo/bar` on the micropython file system.
 
 You may of course specify a root path other than `/www` through the `http_file_handler.Handler` constructor, but the directory must exist, or an error will occur at the time of construction. 
 
 > Warning: If you specify the micropython file system root path (`/`) in the HTTP file handler constructor, you may expose sensitive security information, such as the Webrepl password, through the HTTP interface.  This behavior is strongly discouraged.
 
-This handler only supports HTTP GET requests.  Any other request verb will be rejected.
+This handler only supports HTTP GET requests.  Any other HTTP request verb will be rejected.
 
 This handler recognizes HTML (`text/html`), CSS (`text/css`), and Javascript (`text/javascript`) file endings, and will set the `content-type` header in the response, accordingly.  The `content-length` header will contain the length of the body.  Any file other than the above list of types is treated as `text/plain`
-
-> Note. Future versions of this handler may support configuration to allow better protection of the file and directory contents, in the spirit of Apache httpd.
 
 ### `http_api_handler.Handler`
 
@@ -176,7 +176,7 @@ You can then add the API handler to the `uhttpd.Server`, as we did above with th
 
 This way, any HTTP requests under `http://host/api` get directed to the HTTP API Handler, and everything else gets directed to the HTTP File Handler.
 
-The HTTP API Handler, like the `uhttp.Server`, does not do much processing on the request, but instead uses the HTTP path to locate the first API Handler that matches the sequence of components provided in the constructor.  In the above example, a request to `http://host/api/foo/` would get processed by `api1` (as would requests to `http://host/api/foo/bar`), whereas requests simply to `http://host/api/` would get procecced by `api3`.
+The HTTP API Handler, like the `uhttp.Server`, does not do much processing on the request, but instead uses the HTTP path to locate the first API Handler that matches the sequence of components provided in the constructor.  In the above example, a request to `http://host/api/foo/` would get processed by the `api1` handler (as would requests to `http://host/api/foo/bar`), whereas requests simply to `http://host/api/` would get procecced by the `api3` handler.
 
 ### `stats_api.Handler`
 
@@ -205,11 +205,11 @@ Here is some sample output from curl:
         "esp": {
             "flash_id": 1327328,
             "flash_size": 1048576,
-            "free_mem": 8456
+            "free_mem": 8616
         },
         "gc": {
-            "mem_alloc": 29024,
-            "mem_free": 7264
+            "mem_alloc": 29152,
+            "mem_free": 7136
         },
         "machine": {
             "freq": 80000000,
@@ -217,6 +217,13 @@ Here is some sample output from curl:
         },
         "network": {
             "ap": {
+                "config": {
+                    "authmode": "AUTH_WPA_WPA2_PSK",
+                    "channel": 11,
+                    "essid": "MicroPython-15b8bb",
+                    "hidden": false,
+                    "mac": "0x5ecf7f15b8bb"
+                },
                 "ifconfig": {
                     "dns": "192.168.1.1",
                     "gateway": "192.168.4.1",
@@ -269,8 +276,6 @@ Here is some sample output from curl:
             "version": "3.4.0"
         }
     }
-
-
 
 ## TODO
 

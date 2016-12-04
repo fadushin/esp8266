@@ -77,7 +77,7 @@ class Handler:
             else:
                 logger.info(
                     "ACCESS {} {}".format(request['remote_addr'], full_path))
-                return self.create_dir_listing_response(full_path)
+                return self.create_dir_listing_response(full_path, path)
         else:
             logger.info(
                 "ACCESS {} {}".format(request['remote_addr'], full_path))
@@ -124,15 +124,19 @@ class Handler:
         serializer = lambda stream: self.stream_file(stream, f)
         return (self.file_size(path), serializer)
 
-    def create_dir_listing_response(self, path):
-        length, body = self.generate_dir_listing(path, os.listdir(path))
+    def create_dir_listing_response(self, full_path, path):
+        length, body = self.generate_dir_listing(path, os.listdir(full_path))
         return self.create_response(200, "text/html", length, body)
 
     def generate_dir_listing(self, path, files):
-        data = "<html><body>"
+        data = "<html><body><header><em>uhttpd/{}</em><hr></header><h1>{}</h1><ul>".format("pre-0.1", path)
+        if path != '/':
+            components = path.strip('/').split('/')
+            components = components[:len(components)-1]
+            data += "<li><a href=\"{}\">..</a></li>\n".format("/{}".format("/".join(components)))
         for f in files:
-            data += "<a href=\"{}\">{}</a><br>\n".format(path[1:] + '/' + f, f)
-        data += "</body></html>"
+            data += "<li><a href=\"{}\">{}</a></li>\n".format(path[1:] + '/' + f, f)
+        data += "</ul></body></html>"
         data = data.encode('UTF-8')
         body = lambda stream: stream.write(data)
         return (len(data), body)

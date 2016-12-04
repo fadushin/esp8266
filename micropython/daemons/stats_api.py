@@ -114,7 +114,9 @@ class Handler:
 
     def get_ap_stats(self):
         ap = network.WLAN(network.AP_IF)
-        return self.get_wlan_stats(ap)
+        wlan_stats = self.get_wlan_stats(ap)
+        wlan_stats['config'] = self.get_wlan_config_stats(ap)
+        return wlan_stats
 
     def get_wlan_stats(self, wlan):
         if wlan.active():
@@ -130,6 +132,30 @@ class Handler:
             }
         else:
             return {}
+
+    def get_wlan_config_stats(self, ap):
+        import ubinascii
+        return {
+            'mac': "0x{}".format(ubinascii.hexlify(ap.config('mac')).decode()),
+            'essid': ap.config('essid'),
+            'channel': ap.config('channel'),
+            'hidden': ap.config('hidden'),
+            'authmode': self.get_auth_mode(ap.config('authmode'))
+        }
+
+    def get_auth_mode(self, mode):
+        if mode == network.AUTH_OPEN:
+            return "AUTH_OPEN"
+        elif mode == network.AUTH_WEP:
+            return "AUTH_WEP"
+        elif mode == network.AUTH_WPA_PSK:
+            return "AUTH_WPA_PSK"
+        elif mode == network.AUTH_WPA2_PSK:
+            return "AUTH_WPA2_PSK"
+        elif mode == network.AUTH_WPA_WPA2_PSK:
+            return "AUTH_WPA_WPA2_PSK"
+        else:
+            return "Unknown auth_mode: {}".format(mode)
 
     def get_wlan_status(self, wlan):
         status = wlan.status()
