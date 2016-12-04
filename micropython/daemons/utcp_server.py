@@ -1,4 +1,4 @@
-'''
+"""
 Copyright (c) dushin.net  All Rights Reserved
 
 Redistribution and use in source and binary forms, with or without
@@ -22,86 +22,96 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-'''
+"""
 import socket
 import network
 import micropython
-import errno
 import sys
 from ulog import logger
 
 SO_REGISTER_HANDLER = const(20)
 CONNECTION_TIMEOUT = const(30)
 
-class Server :
-    
-    def __init__(self, port, handler, bind_addr='0.0.0.0', timeout=CONNECTION_TIMEOUT) :
+
+class Server:
+    def __init__(self, port, handler, bind_addr='0.0.0.0',
+                 timeout=CONNECTION_TIMEOUT, use_ssl=False):
         self._port = port
         self._handler = handler
         self._bind_addr = bind_addr
         self._timeout = timeout
+        self._use_ssl = use_ssl
         self._server_socket = None
         self._client_socket = None
 
-    def handle_receive(self, client_socket) :
-        try :
-            done, response = self._handler.handle_request(client_socket)
-            if response and len(response) > 0 :
+    def handle_receive(self, client_socket, remote_addr):
+        try:
+            done, response = self._handler.handle_request(client_socket,
+                                                          remote_addr)
+            if response and len(response) > 0:
+                logger.debug(
+                    "A non-zero response was returned from the utcp_server handler")
                 client_socket.write(response)
-            if done :
+            if done:
+                logger.debug(
+                    "The utcp_server handler is done.  Closing socket.")
                 self.close(client_socket)
                 return False
-            else :
+            else:
+                logger.debug("The utcp_server handler is not done.")
                 self._client_socket = client_socket
                 return True
-        except Exception as e :
+        except Exception as e:
             logger.error("Trapped exception '{}' on receive.".format(e))
             sys.print_exception(e)
             self.close(client_socket)
             return False
 
-    def handle_accept(self, server_socket) :
+    def handle_accept(self, server_socket):
         client_socket, remote_addr = server_socket.accept()
-        logger.info("Accepted connection from: {}".format(remote_addr))
+        logger.debug("Accepted connection from: {}".format(remote_addr))
         client_socket.settimeout(self._timeout)
-        while self.handle_receive(client_socket) :
+        if self._use_ssl:
+            import ussl
+            client_socket = ussl.wrap_socket(client_socket, server_side=True)
+            logger.debug("Connection will use SSL")
+        while self.handle_receive(client_socket, remote_addr):
             pass
 
-    def start(self) :
+    def start(self):
         micropython.alloc_emergency_exception_buf(100)
         ##
         ## Start the listening socket.  Handle accepts asynchronously
         ## in handle_accept/1
         ##
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,
+                                       1)
         self._server_socket.bind((self._bind_addr, self._port))
         self._server_socket.listen(0)
-        self._server_socket.setsockopt(socket.SOL_SOCKET, SO_REGISTER_HANDLER, self.handle_accept)
+        self._server_socket.setsockopt(socket.SOL_SOCKET, SO_REGISTER_HANDLER,
+                                       self.handle_accept)
         ##
         ## Report the interfaces on which we are listening
         ##
         ap = network.WLAN(network.AP_IF)
-        if ap.active(): 
+        if ap.active():
             ifconfig = ap.ifconfig()
-            logger.info("TCP server started on {}:{}".format(ifconfig[0], self._port))
+            logger.info(
+                "TCP server started on {}:{}".format(ifconfig[0], self._port))
         sta = network.WLAN(network.STA_IF)
-        if sta.active(): 
+        if sta.active():
             ifconfig = sta.ifconfig()
-            logger.info("TCP server started on {}:{}".format(ifconfig[0], self._port))
+            logger.info(
+                "TCP server started on {}:{}".format(ifconfig[0], self._port))
 
-    
-    def stop(self) :
-        if self._client_socket :
+    def stop(self):
+        if self._client_socket:
             self.client_socket.close()
-        if self._server_socket :
+        if self._server_socket:
             self._server_socket.close()
-    
 
-    def close(self, socket_) :
+    def close(self, socket_):
         logger.debug("Closing socket {}".format(socket_))
         socket_.close()
         self._client_socket = None
-
-
-    

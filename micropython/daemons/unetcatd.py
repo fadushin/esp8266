@@ -46,7 +46,7 @@ class Server :
         if data.startswith(".") :
             return (True, b'')
         else :
-            return (False, buf)
+            return (False, line)
     
 
 #server = Server(44444)
