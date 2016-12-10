@@ -35,37 +35,38 @@ CONTENT_TYPE_MAP = {
 
 
 class Handler:
-    def __init__(self, root_path='/www'):
+    def __init__(self, root_path='/www', block_size=1024):
         if not self.exists(root_path) or not self.is_dir(root_path):
             msg = "Root path {} is not an existing directory".format(root_path)
             raise Exception(msg)
         self._root_path = root_path
+        self._block_size = block_size
 
-    ##
-    ## callbacks
-    ##
+    #
+    # callbacks
+    #
 
     def handle_request(self, request):
-        ##
-        ## We only support GET
-        ##
+        #
+        # We only support GET
+        #
         verb = request['verb']
         if verb.lower() != 'get':
             return self.create_message_response(
                 500, "Unsupported verb: {}".format(verb)
             )
-        ##
-        ## If the path doesn't exist, 404 out
-        ##
+        #
+        # If the path doesn't exist, 404 out
+        #
         path = request['path']
         full_path = "{}{}".format(self._root_path, path).rstrip('/')
         if not self.exists(full_path):
             logger.info(
                 "NOT_FOUND {} {}".format(request['remote_addr'], full_path))
             raise uhttpd.NotFoundException(full_path)
-        ##
-        ## Otherwise, generate a file listing or a file
-        ##
+        #
+        # Otherwise, generate a file listing or a file
+        #
         if self.is_dir(full_path):
             logger.debug("{} is a directory.".format(full_path))
             index_path = full_path + "/index.html"
@@ -86,9 +87,9 @@ class Handler:
     def module(self):
         return 'http_file_handler'
 
-    ##
-    ## internal operations
-    ##
+    #
+    # internal operations
+    #
 
     def is_dir(self, path):
         try:
@@ -153,7 +154,7 @@ class Handler:
 
     def stream_file(self, stream, f):
         while True:
-            buf = f.read(1024)
+            buf = f.read(self._block_size)
             if buf:
                 stream.write(buf)
             else:

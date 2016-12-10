@@ -1,99 +1,67 @@
-def deep_sleep(secs) :
-    import machine
+'''
+Copyright (c) dushin.net  All Rights Reserved
 
-    # configure RTC.ALARM0 to be able to wake the device
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of dushin.net nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY dushin.net ``AS IS'' AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL dushin.net BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+'''
+
+import machine
+import os
+
+def module_to_dict(mod) :
+    ret = {}
+    for i in dir(mod) :
+        if not i.startswith('__') :
+            ret[i] = getattr(mod, i)
+    return ret
+
+def merge_dict(a, b) :
+    ret = a.copy()
+    ret.update(b)
+    return ret
+
+def set_datetime(year, month, day, hour=0, minute=0, second=0) :
     rtc = machine.RTC()
-    rtc.irq(trigger=rtc.ALARM0, wake=machine.DEEPSLEEP)
+    rtc.datetime((year, month, day, hour, minute, second, 0, 0))
 
-    # set RTC.ALARM0 to fire after 10 seconds (waking the device)
-    rtc.alarm(rtc.ALARM0, secs)
+def print_module(module) :
+    f = open(module + '.py')
+    print("%s" % f.read())
+    
+def datetimestr() :
+    import time
+    (year, month, day, hour, minute, second, millis, _tzinfo) = time.localtime()
+    return "%d-%02d-%02dT%02d:%02d:%02d.%03d" % (year, month, day, hour, minute, second, millis)
 
-    # put the device to sleep
-    machine.deepsleep()
-
-def set_led_error(pin_id=15) :
+def set_led_error(pin_id=14) :
     import machine
     pin = machine.Pin(pin_id, machine.Pin.OUT)
     pin.high()
 
-def clear_led_error(pin_id=2) :
+def clear_led_error(pin_id=14) :
     import machine
     pin = machine.Pin(pin_id, machine.Pin.OUT)
     pin.low()
-    
-    
-import time
 
-def dht_test(pin=2, n=1, sleep_s=5) :
-    import dht
-    import machine
-    d = dht.DHT11(machine.Pin(pin))
-    for i in range(n):
-        d.measure()
-        line = "temp(f): %s humidity: %s" % (32.0 + 1.8*d.temperature(), d.humidity()) 
-        print(line)
-        #upload("192.168.1.154", 44404, line)
-        upload("KMABOXBO9", "7rwzw8bh", 32.0 + 1.8*d.temperature(), d.humidity())
-        #print("Going into deep sleep for %s secs ..." % sleep_secs)
-        #deep_sleep(sleep_secs)
-        print("Sleeping %s secs ..." % sleep_s)
-        time.sleep(sleep_s)
-    
-def upload(stationid, password, tempf, humidity) :
-    import socket
-    try :
-        #addr_info = socket.getaddrinfo(address, port)
-        addr_info = socket.getaddrinfo("weatherstation.wunderground.com", 80)
-        url = "/weatherstation/updateweatherstation.php?ID=%s&PASSWORD=%s&dateutc=now&tempf=%s&humidity=%s&softwaretype=ESP8266+DHT11&action=updateraw" % (stationid, password, tempf, humidity)
-        addr = addr_info[0][-1]
-        s = socket.socket()
-        s.connect(addr)
-        val = s.send(b"GET %s HTTP/1.0\r\nHost: weatherstation.wunderground.com\r\nUser-Agent: curl/7.43.0\r\nAccept: */*\r\n\r\n" % url)
-        print("send val: %s" % val)
-        print(s.read())
-        s.close()
-        send_status("uploaded data")
-    except Exception as E :
-        print("An error occurred: %s" % E)
-        #set_led_error(5)
-        import webrepl
-        webrepl.start()
-        raise Exception("Failed to upload data to wunderground.com: %s" % E)
+def file_size(path) :
+    return os.stat(path)[6]
 
-def send_status(msg, address='192.168.1.154', port=44404) :
-    try :
-        import socket
-        addr_info = socket.getaddrinfo(address, port)
-        addr = addr_info[0][-1]
-        s = socket.socket()
-        s.connect(addr)
-        s.send(msg)
-        s.close()
-        print("Sent %s to %s:%s" % (msg, address, port))
-    except Exception as E :
-       print("An error occurred sending %s to %s:%s: %s" % (msg, address, port, E))
-
-def blink(pin_id) :
-    import machine
-    pin = machine.Pin(pin_id, machine.Pin.OUT)
-    while True :
-        pin.high()
-        time.sleep(1)
-        pin.low()
-        time.sleep(1)
-
-
-def debug() :
-    import os
-    print('os.listdir: %s' % os.listdir())
-    #import importlib
-    #importlib.reload(port_diag)
-    import port_diag
-
-
-def main() :
-    print('fd.main: ok')
-    #dht_test()
-
-print("Loaded fd.py module")
-#main()

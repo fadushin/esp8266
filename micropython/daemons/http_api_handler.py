@@ -46,6 +46,11 @@ class Handler:
         if handler:
             logger.debug("Found api_handler {}".format(handler.module()))
             verb = request['verb'].lower()
+            if 'body' in request:
+                try:
+                    request['body'] = json.loads(request['body']) if request['body'].trim() else None
+                except:
+                    raise uhttpd.BadRequestException("Malformed JSON body")
             if verb == 'get':
                 logger.debug("Verb is 'get'")
                 response = handler.get(context, request)
@@ -62,12 +67,12 @@ class Handler:
                 # TODO add support for more verbs!
                 error_message = "Unsupported verb: {}".format(verb)
                 logger.debug(error_message)
-                raise (Exception(error_message))
+                raise uhttpd.BadRequestException(error_message)
         else:
             error_message = "No handler found for components {}".format(
                 components)
             logger.debug(error_message)
-            raise (Exception(error_message))
+            raise uhttpd.NotFoundException(error_message)
         data = json.dumps(response).encode('UTF-8')
         body = lambda stream: stream.write(data)
         return {

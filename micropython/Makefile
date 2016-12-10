@@ -30,19 +30,22 @@ LOGGING_MODULES= \
 	logging/syslog_sink.py
 
 DAEMON_MODULES=\
-	daemons/utcp_server.py \
 	daemons/uhttpd.py \
 	daemons/http_file_handler.py \
 	daemons/http_api_handler.py \
 	daemons/stats_api.py
 
-OUTPUTS=$(patsubst %.py, %.mpy, $(LOGGING_MODULES) $(DAEMON_MODULES))
+TOOL_MODULES=\
+	tools/ush.py
+
+OUTPUTS=$(patsubst %.py, %.mpy, $(LOGGING_MODULES) $(DAEMON_MODULES) $(TOOL_MODULES))
 
 all: $(OUTPUTS)
 
 clean:
 	rm logging/*.mpy
 	rm daemons/*.mpy
+	rm tools/*.mpy
 
 %.mpy: %.py
 	mpy-cross $<

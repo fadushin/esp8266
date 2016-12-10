@@ -2,23 +2,39 @@
 
 This set of modules provides a simple HTTP framework and server, providing an HTTP interface into your ESP8266.  Having an HTTP server allows developers to create management consoles for their ESP8266 devices, which can be very useful for configuration and troubleshooting devices, or even for bootstrapping them from an initial state.
 
+Features include:
+
+* Support for a strict subset of the HTTP/1.1 protocol (RFC 2616)
+* Asynchronous handling of requests, so that the server can run while the ESP8266 runs other tasks
+* Support for HTTP/Basic authentication
+* Handler for servicing files on the Micropython file system
+* Extensible API for adding REST-ful JSON-based APIs
+
+
 By itself, the `uhttpd` module is just a TCP server and framework for adding handlers to process HTTP requests.  The actual servicing of HTTP requests is done by installing handlers, which are passed to the `uhttpd` server at creation time.  It's the handlers that actually do the heavy lifting when it comes to servicing HTTP requests.  
 
 This package includes handlers for servicing files on the micropython file system (e.g., HTML, Javascript, CSS, etc), as well as handlers for managing REST-ful API calls, essential components in any modern web-based application.
+
+Once started, the `uhttpd` server runs in the background, so that the ESP8266 can do other tasks.  When the server accepts a request, however, the ESP8266 will block for the period of time it takes to accept the request.
+
+TCP/IP connections between clients and the `uhttpd` server endure for the duration of a single request.  Once the client opens a connection to the server, the server will dispatch the request to an appropriate handler and wait for the response from the handler.  It will then send the response back to the client on the open connection, and then close the connection from the client.
  
 A driving design goal of this package is to have minimal impact on the ESP8266 device, itself, and to provide the tools that allow developers to implement rich client-side applications.  By design, web applications built with this framework should do as little work as possible on the server side, but should instead make use of modern web technologies to allow the web client or browser to perform significant parts of business logic.  In most cases, the web clients will have far more memory and compute resources than the ESP8266 device, itself, so it is wise to keep as much logic as possible on the client side.
 
-> Warning: This software provides _no security_ for your applications.  When this software is running, any machine on your network may connect to your ESP8266 and browse the parts of the file system you expose through configuration, including possibly sensitive security credentials stored in plain text.  AS WRITTEN, THIS SOFTWARE IS NOT INTENDED FOR USE IN AN UNTRUSTED NETWORK!
+> Warning: This software currently provides no transport-layer protection for your applications.  When this software is running, requests are sent in clear text, including not only the HTTP headers you may use for authentication, but also the contents of the HTTP requests and responses.  Malicious users on your network using off-the-shelf packet sniffers can read your HTTP traffic with no difficulty.  AS WRITTEN, THIS SOFTWARE IS NOT INTENDED FOR USE IN AN UNTRUSTED NETWORK!
+
+The following work is planned for the future:
+
+* Support for HTTP/S
 
 ## Modules and Dependencies
 
 The `uhttpd` framework and server is comprised the following python modules:
 
 * `uhttpd.py` -- provides HTTP server and framework
-* `utcp_server.py` -- provides basic TCP networking layer of abstraction
 * `http_file_handler.py` -- a file handler for the `uhttpd` server
 * `http_api_handler.py` -- a handler for servicing REST-ful APIs
-* `stats_api_handler` -- an APU handler used to service run-time statistics about the device
+* `stats_api_handler` -- an API handler used to service run-time statistics about the device
 
 This module relies on the `ulog` facility, defined in the [logging](/micropython/logging) area of this repository.
 
@@ -41,7 +57,6 @@ For example, to build the bytecode,
     mpy-cross logging/ulog.py
     mpy-cross logging/console_sink.py
     mpy-cross logging/syslog_sink.py
-    mpy-cross daemons/utcp_server.py
     mpy-cross daemons/uhttpd.py
     mpy-cross daemons/http_file_handler.py
     mpy-cross daemons/http_api_handler.py
@@ -50,7 +65,7 @@ For example, to build the bytecode,
 If you have `webrepl` running and `webrepl_cli.py` in your `PATH`, then you can upload the files you need to your device (adjusted of course for the IP address of your ESP8266), as follows:
 
     prompt$ export PATH=/Volumes/case-sensitive/webrepl:$PATH
-    prompt$ bin/upload.sh 192.1681.180 logging/*.mpy daemons/*.mpy
+    prompt$ bin/upload.sh 192.168.1.180 logging/*.mpy daemons/*.mpy
 
 The above command will use the `webrepl_cli.py` tool to upload the needed files to your ESP8266, using the `webrepl` server.
 
@@ -82,11 +97,51 @@ You should then see some logs printed to the console, indicating that the server
     2000-01-01T08:09:15.005 [info] esp8266: TCP server started on 192.168.4.1:80
     2000-01-01T08:09:15.005 [info] esp8266: TCP server started on 0.0.0.0:80
 
+By default, the `uhttpd` server requires authentication, using the username `admin` and the password `uhttpD`.  These credentials are configurable.  (See reference section, below)
+
 You may now connect to your ESP8266 via a web browser or curl and browse your file system, e.g.,
 
     prompt$ curl -i 'http://192.168.1.180/' 
     HTTP/1.1 200 OK
     Content-Length: 38
+    Content-Type: text/html
+    
+    <html><body>Hello World!</body></html>
+
+## HTTP Authentication
+
+The `uhttpd.Server` supports HTTP Basic authentication.  By default, HTTP authentication is not required, but you can configure the `uhttpd.Server` to require authentication by setting the `require_auth` configuration property to `True` in the `uhttpd.Server` constructor.  (For more information about the `uhttpd.Server` constructor, see the _Configuration_ section below.)
+
+    >>> import uhttpd
+    >>> import http_file_handler
+    >>> server = uhttpd.Server(
+        [('/', http_file_handler.Handler('/www'))],
+        {'require_auth': True}
+    )
+    >>> server.start()
+
+The default HTTP user name is `admin`, and the default password is `uhttpD`, but these values are configurable, as described in the _Configuration_ section, below.  This server only supports one username and password for each server instance.
+
+Warning: This software currently provides no transport-layer protection for your applications.  HTTP credentials, while obfuscated with BASE-64 encoding, per the HTTP 1.1 spec, are sent in plaintext, and are therefore accessible to malicious parties on your network.  AS WRITTEN, THIS SOFTWARE IS NOT INTENDED FOR USE IN AN UNTRUSTED NETWORK!
+
+For example, if you try to make a request without supplying HTTP Basic authentiction credentials (i.e., a username and password), your request will be rejected with an HTTP 401 error:
+
+    curl -i 'http://192.168.1.180' 
+    HTTP/1.1 401 Unauthorized
+    Server: uhttpd/pre-0.1 (running in your devices)
+    Content-Type: text/html
+    www-authenticate: Basic realm=esp8266
+    
+    <html><body><header>uhttpd/pre-0.1<hr></header>Unauthorized</body></html>
+
+If you use a web browser to access this page, you should get a popup window prompting you for a username and password.
+
+When you supply the correct credentials (e.g., via `curl`), you should be granted access to the requested URL:
+
+    curl -i -u admin:uhttpD 'http://192.168.1.180' 
+    HTTP/1.1 200 OK
+    Server: uhttpd/pre-0.1 (running in your devices)
+    Content-Length: 40
     Content-Type: text/html
     
     <html><body>Hello World!</body></html>
@@ -116,11 +171,38 @@ For example, given the following construction:
 
 a request of the form `http://host/foo/bar/` will be handled by `handler1`, whereas a request of the form `http://host/gnat/` will be handled by `handler3`.
 
-You may optionally specify a port at construction time.  The default is 80.
-
 Once started, the `uhttpd.Server` will listen asynchronously for connections.  While a connection is not being serviced, the application may proceed to do work (e.g., via the REPL).  Once a request is accepted, the entire request processing, including the time spent in the handlers, is synchronous.
 
 A `uhttpd.Server` may be stopped via the `stop` method.
+
+#### Configuration
+
+The `uhttpd.Server` can be configured using the `config` parameter at construction time, which is dictionary of name-value pairs.  E.g.,
+
+    server = uhttpd.Server([...], config={'port': 8080})
+
+The valid entries for this configuration parameter are described in detail below.
+
+##### `port`
+
+This parameter denotes the TCP/IP port on which the `uhttpd` should listen.  The type of this paramter is `int`, and the default value is 80.
+
+##### `require_auth`
+
+This parameter indicates whether HTTP authentication is required.  The type of this parameter is boolean, and the default value is `False`.  If this parameter is set to `True`, all requests into this server instance require HTTP authentication headers, per RFC 7231.
+
+##### `realm`
+
+This parameter denotes the HTTP authorization realm in which users should be authenticated.  This realm is returned back to the HTTP client when authorization is required but not credentials are supported.  The type of this parameter is `string`.  The default realm is `esp8266`.
+
+##### `user`
+
+This parameter denotes the HTTP user name, which needs to be supplied by the user in an HTTP Basic authentication header, per RFC 7231.  The default user name is `admin`.
+
+##### `password`
+
+This parameter denotes the HTTP password, which needs to be supplied by the user in an HTTP Basic authentication header, per RFC 7231.  The default password is `uhttpD`.
+
 
 ### `http_file_handler.Handler`
 
@@ -145,6 +227,8 @@ Once your handler is created, you can then provide it to the `uhttpd.Server` con
 You may of course specify a root path other than `/www` through the `http_file_handler.Handler` constructor, but the directory must exist, or an error will occur at the time of construction. 
 
 > Warning: If you specify the micropython file system root path (`/`) in the HTTP file handler constructor, you may expose sensitive security information, such as the Webrepl password, through the HTTP interface.  This behavior is strongly discouraged.
+
+You may optionally specify the `block_size` as a parameter to the `http_file_handler.Handler` constructor.  This integer value (default: 1024) determines the size of the buffer to use when streaming a file back to the client.  Larger chunk sizes require more memory and may run into issues with memory.  Smaller chunk sizes may result in degradation in performance.
 
 This handler only supports HTTP GET requests.  Any other HTTP request verb will be rejected.
 
@@ -205,11 +289,11 @@ Here is some sample output from curl:
         "esp": {
             "flash_id": 1327328,
             "flash_size": 1048576,
-            "free_mem": 8616
+            "free_mem": 8288
         },
         "gc": {
-            "mem_alloc": 29152,
-            "mem_free": 7136
+            "mem_alloc": 29952,
+            "mem_free": 6336
         },
         "machine": {
             "freq": 80000000,
@@ -220,7 +304,7 @@ Here is some sample output from curl:
                 "config": {
                     "authmode": "AUTH_WPA_WPA2_PSK",
                     "channel": 11,
-                    "essid": "MicroPython-15b8bb",
+                    "essid": "MicroPython-80d271",
                     "hidden": false,
                     "mac": "0x5ecf7f15b8bb"
                 },
@@ -255,17 +339,15 @@ Here is some sample output from curl:
             },
             "maxsize": 2147483647,
             "modules": [
-                "webrepl",
-                "utcp_server",
-                "ulog",
-                "websocket_helper",
                 "stats_api",
-                "console_sink",
-                "http_file_handler",
                 "flashbdev",
-                "http_api_handler",
+                "console_sink",
+                "webrepl_cfg",
                 "uhttpd",
-                "webrepl_cfg"
+                "webrepl",
+                "http_api_handler",
+                "ulog",
+                "websocket_helper"
             ],
             "path": [
                 "",
@@ -273,10 +355,12 @@ Here is some sample output from curl:
                 "/"
             ],
             "platform": "esp8266",
-            "version": "3.4.0"
+            "version": "3.4.0",
+            "vfs": {
+                "bavail": 78,
+                "blocks": 101,
+                "frsize": 4096
+            }
         }
     }
 
-## TODO
-
-Document the handler mechanism and techniques for implementing REST-ful APIs.

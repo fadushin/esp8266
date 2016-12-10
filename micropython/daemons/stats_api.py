@@ -68,7 +68,17 @@ class Handler:
             'modules': self.keys(sys.modules),
             'path': sys.path,
             'platform': sys.platform,
-            'version': sys.version
+            'version': sys.version,
+            'vfs': self.get_vfs_stats()
+        }
+
+    def get_vfs_stats(self):
+        import os
+        stats = os.statvfs('/')
+        return {
+            'frsize': stats[1],
+            'blocks': stats[2],
+            'bavail': stats[4]
         }
 
     def keys(self, pairs):
