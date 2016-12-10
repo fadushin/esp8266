@@ -75,7 +75,20 @@ Some commands support globbing.  Only wildcard matching (`*`) is supported.
         -rwxrwxrwxx 598             main.py
         -rwxrwxrwxx 15              webrepl_cfg.py
 
+You can dump the contents of a file in hexadecimal format using the `dump` command:
 
+	[/] ush$ dump boot.py
+	00000000:  23 20 54 68 69 73 20 66 69 6c 65 20 69 73 20 65  |# This file is e|
+	00000010:  78 65 63 75 74 65 64 20 6f 6e 20 65 76 65 72 79  |xecuted on every|
+	00000020:  20 62 6f 6f 74 20 28 69 6e 63 6c 75 64 69 6e 67  | boot (including|
+	00000030:  20 77 61 6b 65 2d 62 6f 6f 74 20 66 72 6f 6d 20  | wake-boot from |
+	00000040:  64 65 65 70 73 6c 65 65 70 29 0a 23 69 6d 70 6f  |deepsleep).#impo|
+	00000050:  72 74 20 65 73 70 0a 23 65 73 70 2e 6f 73 64 65  |rt esp.#esp.osde|
+	00000060:  62 75 67 28 4e 6f 6e 65 29 0a 69 6d 70 6f 72 74  |bug(None).import|
+	00000070:  20 67 63 0a 69 6d 70 6f 72 74 20 77 65 62 72 65  | gc.import webre|
+	00000080:  70 6c 0a 77 65 62 72 65 70 6c 2e 73 74 61 72 74  |pl.webrepl.start|
+	00000090:  28 29 0a 67 63 2e 63 6f 6c 6c 65 63 74 28 29 0a  |().gc.collect().|
+	
 ### Memory and Disk statistics
 
 The `ush` tools comes with some useful commands for getting disk and memory statistics, and for running the Micropython garbage collector:
