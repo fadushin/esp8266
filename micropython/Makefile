@@ -29,22 +29,22 @@ LOGGING_MODULES= \
 	logging/console_sink.py \
 	logging/syslog_sink.py
 
-DAEMON_MODULES=\
-	daemons/uhttpd.py \
-	daemons/http_file_handler.py \
-	daemons/http_api_handler.py \
-	daemons/stats_api.py
+UHTTPD_MODULES=\
+	uhttpd/uhttpd.py \
+	uhttpd/http_file_handler.py \
+	uhttpd/http_api_handler.py \
+	uhttpd/stats_api.py
 
 TOOL_MODULES=\
 	tools/ush.py
 
-OUTPUTS=$(patsubst %.py, %.mpy, $(LOGGING_MODULES) $(DAEMON_MODULES) $(TOOL_MODULES))
+OUTPUTS=$(patsubst %.py, %.mpy, $(LOGGING_MODULES) $(UHTTPD_MODULES) $(TOOL_MODULES))
 
 all: $(OUTPUTS)
 
 clean:
 	rm logging/*.mpy
-	rm daemons/*.mpy
+	rm uhttpd/*.mpy
 	rm tools/*.mpy
 
 %.mpy: %.py

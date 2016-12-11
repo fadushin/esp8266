@@ -57,15 +57,16 @@ For example, to build the bytecode,
     mpy-cross logging/ulog.py
     mpy-cross logging/console_sink.py
     mpy-cross logging/syslog_sink.py
-    mpy-cross daemons/uhttpd.py
-    mpy-cross daemons/http_file_handler.py
-    mpy-cross daemons/http_api_handler.py
-    mpy-cross daemons/stats_api.py
+    mpy-cross uhttpd/uhttpd.py
+    mpy-cross uhttpd/http_file_handler.py
+    mpy-cross uhttpd/http_api_handler.py
+    mpy-cross uhttpd/stats_api.py
+    mpy-cross tools/ush.py
 
 If you have `webrepl` running and `webrepl_cli.py` in your `PATH`, then you can upload the files you need to your device (adjusted of course for the IP address of your ESP8266), as follows:
 
     prompt$ export PATH=/Volumes/case-sensitive/webrepl:$PATH
-    prompt$ bin/upload.sh 192.168.1.180 logging/*.mpy daemons/*.mpy
+    prompt$ bin/upload.sh 192.168.1.180 logging/*.mpy uhttpd/*.mpy
 
 The above command will use the `webrepl_cli.py` tool to upload the needed files to your ESP8266, using the `webrepl` server.
 
