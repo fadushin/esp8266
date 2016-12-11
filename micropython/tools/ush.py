@@ -55,7 +55,7 @@ class Ush:
 
     def run(self):
         try:
-            print("Welcome to ush pre-0.1.  Type 'help' for help")
+            print("Welcome to ush-0.1.  Type 'help' for help.  ^D to exit")
             while True:
                 line = Ush.prompt().strip()
                 if line:

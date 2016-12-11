@@ -153,10 +153,11 @@ class Handler:
         }
 
     def stream_file(self, stream, f):
+        buf = bytearray(self._block_size)
         while True:
-            buf = f.read(self._block_size)
-            if buf:
-                stream.write(buf)
+            n = f.readinto(buf)
+            if n:
+                stream.write(buf[:n])
             else:
                 break
 

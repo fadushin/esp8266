@@ -47,7 +47,7 @@ class Server:
             port=self._config['port'],
             handler=self,
             use_ssl=self._config['use_ssl'])
-        self._version = "pre-0.1"
+        self._version = "0.1"
 
     #
     # API
@@ -136,6 +136,8 @@ class Server:
             return self.not_found_error(client_socket, e)
         except BaseException as e:
             return self.internal_server_error(client_socket, e)
+        finally:
+            gc.collect()
 
     #
     # Internal operations
