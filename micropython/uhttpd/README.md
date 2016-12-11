@@ -98,8 +98,6 @@ You should then see some logs printed to the console, indicating that the server
     2000-01-01T08:09:15.005 [info] esp8266: TCP server started on 192.168.4.1:80
     2000-01-01T08:09:15.005 [info] esp8266: TCP server started on 0.0.0.0:80
 
-By default, the `uhttpd` server requires authentication, using the username `admin` and the password `uhttpD`.  These credentials are configurable.  (See reference section, below)
-
 You may now connect to your ESP8266 via a web browser or curl and browse your file system, e.g.,
 
     prompt$ curl -i 'http://192.168.1.180/' 
