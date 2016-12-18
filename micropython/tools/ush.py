@@ -23,8 +23,10 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-import uos
+import os
 import sys
+
+VERSION = "master"
 
 
 class Ush:
@@ -55,7 +57,7 @@ class Ush:
 
     def run(self):
         try:
-            print("Welcome to ush-0.1.  Type 'help' for help.  ^D to exit")
+            print("Welcome to ush-{}.  Type 'help' for help.  ^D to exit".format(VERSION))
             while True:
                 line = Ush.prompt().strip()
                 if line:
@@ -74,7 +76,7 @@ class Ush:
 
     @staticmethod
     def prompt():
-        cwd = uos.getcwd()
+        cwd = os.getcwd()
         print("[{}{}] ush$ ".format("/" if not cwd else "", cwd), end="",
               flush=True),
         return input()
@@ -94,7 +96,7 @@ class Cmd:
     @staticmethod
     def is_dir(path):
         try:
-            uos.listdir(path)
+            os.listdir(path)
             return True
         except OSError:
             return False
@@ -102,7 +104,7 @@ class Cmd:
     @staticmethod
     def exists(path):
         try:
-            uos.stat(path)
+            os.stat(path)
             return True
         except OSError:
             return False
@@ -131,7 +133,7 @@ class Cmd:
         components = path.split("*")
         f = filter(
             lambda d: Cmd.matches(d, components),
-            uos.listdir()
+            os.listdir()
         )
         ret = []
         for i in f:
@@ -142,7 +144,7 @@ class Cmd:
     def traverse(path, visitor, state={}):
         state = visitor.pre(path, state)
         if Cmd.is_dir(path):
-            contents = uos.listdir(path)
+            contents = os.listdir(path)
             contents.sort()
             for c in contents:
                 new_path = "{}/{}".format(path, c)
@@ -170,7 +172,7 @@ class Ls(Cmd):
     def handle_command(self, args):
         contents = []
         if args == []:
-            contents = uos.listdir()
+            contents = os.listdir()
         else:
             for file in args:
                 el = self.glob(file)
@@ -182,14 +184,14 @@ class Ls(Cmd):
 
     @staticmethod
     def list_dir(d):
-        contents = uos.listdir(d)
+        contents = os.listdir(d)
         contents.sort()
         for c in contents:
             Cmd.list_file(c)
 
     @staticmethod
     def list_file(f):
-        stats = uos.stat(f)
+        stats = os.stat(f)
         print("    {}rwxrwxrwxx {}\t\t{}{}".format(
             "d" if Cmd.is_dir(f) else "-", stats[6], f,
             "/" if Cmd.is_dir(f) else ""))
@@ -205,7 +207,7 @@ class Cd(Cmd):
 
     def handle_command(self, args):
         if len(args) == 0:
-            uos.chdir('/')
+            os.chdir('/')
             return
         elif len(args) != 1:
             print("Syntax: cd [<dir>]")
@@ -220,7 +222,7 @@ class Cd(Cmd):
         elif not Cmd.is_dir(d[0]):
             print("Error!  Not a directory: {}".format(d[0]))
         else:
-            uos.chdir(d[0])
+            os.chdir(d[0])
 
     def help(self):
         return "[<pattern>] Change directory.  No pattern changes to '/'"
@@ -231,7 +233,7 @@ class Pwd(Cmd):
         super().__init__()
 
     def handle_command(self, _args):
-        cwd = uos.getcwd()
+        cwd = os.getcwd()
         print("{}{}".format("/" if not cwd else "", cwd))
 
     def help(self):
@@ -275,7 +277,6 @@ class Cat(Cmd):
 class Dump(Cmd):
     def __init__(self):
         super().__init__()
-        self._filter = ''.join([(len(repr(chr(x))) == 3) and chr(x) or '.' for x in range(256)])
         self._buf = bytearray(16)
 
     def handle_command(self, args):
@@ -296,6 +297,8 @@ class Dump(Cmd):
     # adapted from https://gist.github.com/7h3rAm/5603718
 
     def dump(self, filename):
+        if not self._filter:
+            self._filter = ''.join([(len(repr(chr(x))) == 3) and chr(x) or '.' for x in range(256)])
         import uio
         f = uio.open(filename)
         total_read = 0
@@ -330,7 +333,7 @@ class Mkdir(Cmd):
         if Cmd.exists(d):
             print("Error!  Already exists: {}".format(d))
         else:
-            uos.mkdir(d)
+            os.mkdir(d)
 
     def help(self):
         return "<dirname> Make a directory."
@@ -371,10 +374,10 @@ class Rmdir(Cmd):
             print("Error!  Does not exist: {}".format(d))
         elif not Cmd.is_dir(d):
             print("Error!  Not a directory: {}".format(d))
-        elif uos.listdir(d):
+        elif os.listdir(d):
             print("Error!  Directory not empty: {}".format(d))
         else:
-            uos.rmdir(d)
+            os.rmdir(d)
 
     def help(self):
         return "<dirname> Remove an empty directory"
@@ -386,12 +389,12 @@ class RemoveVisitor(Cmd):
 
     def pre(self, path, state):
         if not Cmd.is_dir(path):
-            uos.remove(path)
+            os.remove(path)
         return state
 
     def post(self, path, state):
         if Cmd.is_dir(path):
-            uos.rmdir(path)
+            os.rmdir(path)
         return state
 
 
@@ -413,7 +416,7 @@ class Rm(Cmd):
         elif Cmd.is_dir(path) and "-r" in args0:
             Cmd.traverse(path, self._visitor)
         else:
-            uos.remove(path)
+            os.remove(path)
 
     def help(self):
         return "[-r] <file> Remove a file (-r to recursively remove a directory)."
@@ -434,7 +437,7 @@ class Mv(Cmd):
         elif Cmd.exists(b):
             print("Error!  Target exists: {}".format(b))
         else:
-            uos.rename(a, b)
+            os.rename(a, b)
 
     def help(self):
         return "<src> <tgt> Move a file or directory."
@@ -445,7 +448,7 @@ class Df(Cmd):
         super().__init__()
 
     def handle_command(self, _args):
-        stats = uos.statvfs('/')
+        stats = os.statvfs('/')
         frsize = stats[1]
         blocks = stats[2]
         bavail = stats[4]

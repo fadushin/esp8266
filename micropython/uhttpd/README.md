@@ -8,14 +8,14 @@ Features include:
 * Asynchronous handling of requests, so that the server can run while the ESP8266 runs other tasks
 * Support for HTTP/Basic authentication
 * Handler for servicing files on the Micropython file system
-* Extensible API for adding REST-ful JSON-based APIs
+* Extensible API for adding REST-ful JSON and query-based APIs
 
 
-By itself, the `uhttpd` module is just a TCP server and framework for adding handlers to process HTTP requests.  The actual servicing of HTTP requests is done by installing handlers, which are passed to the `uhttpd` server at creation time.  It's the handlers that actually do the heavy lifting when it comes to servicing HTTP requests.  
+By itself, the `uhttpd` module is just a TCP server and framework for adding handlers to process HTTP requests.  The actual servicing of HTTP requests is done by installing handlers, which are passed to the `uhttpd` server at creation time.  It's the handlers that actually do the heavy lifting when it comes to servicing HTTP requests.  Handlers are triggered based on the URLs that are used by the client.  Multiple handlers can be installed, each of which can handle a special case based on a particular URL prefix.
 
 This package includes handlers for servicing files on the micropython file system (e.g., HTML, Javascript, CSS, etc), as well as handlers for managing REST-ful API calls, essential components in any modern web-based application.
 
-Once started, the `uhttpd` server runs in the background, so that the ESP8266 can do other tasks.  When the server accepts a request, however, the ESP8266 will block for the period of time it takes to accept the request.
+Once started, the `uhttpd` server runs in the background, so that the ESP8266 can do other tasks.  When the server accepts a request, however, the ESP8266 will block for the period of time it takes to process the request, i.e., read and parse the request sent from the client, dispatch the parsed request to the designated handler to get a response, and send the response back to the client.  Ordinarily, this should only take a few milliseconds, but applications may vary in their request processing time.
 
 TCP/IP connections between clients and the `uhttpd` server endure for the duration of a single request.  Once the client opens a connection to the server, the server will dispatch the request to an appropriate handler and wait for the response from the handler.  It will then send the response back to the client on the open connection, and then close the connection from the client.
  
@@ -34,7 +34,7 @@ The `uhttpd` framework and server is comprised the following python modules:
 * `uhttpd.py` -- provides HTTP server and framework
 * `http_file_handler.py` -- a file handler for the `uhttpd` server
 * `http_api_handler.py` -- a handler for servicing REST-ful APIs
-* `stats_api_handler` -- an API handler used to service run-time statistics about the device
+* `stats_api_handler` (optional) -- a demo API handler used to service run-time statistics about the device
 
 This module relies on the `ulog` facility, defined in the [logging](/micropython/logging) area of this repository.
 
@@ -42,7 +42,21 @@ There is currently no `upip` support for this package.
 
 ## Loading Modules
 
-Some of the modules in this package require significant amounts of RAM to load and run.  While you can run these modules by loading them on the Micropython file system and allowing the runtime to compile the source modules for you, it is recommended to either freeze the modules in your firmware (a rather involved process, and recommended for production), or to compile to bytcode and load the generated `.mpy` files (recommended for development), which will decrease the memory footprint of your application using these modules.  You can acquire the `mpy-cross` tool which will compile micro python source modules to bytecode, by installing and building the micro python source project, as described [here](https://github.com/micropython/micropython/tree/master/esp8266)
+Some of the modules in this package require significant amounts of RAM to load and run.  While you may be able to run some combination of these modules by loading them on the Micropython file system and allowing the runtime to compile the source modules for you, you will likely run out of RAM before you hit more than a trivial example.  It is therefore recommended to either freeze the modules in your firmware (recommended) or to compile to bytcode and load the generated `.mpy` files, which will decrease the memory footprint of your application using these modules.
+
+Both frozen and pre-compiled bytecode require building the [micropython](https://github.com/micropython/micropython/tree/master/esp8266) project.  
+
+
+### Frozen Bytecode (recommended)
+
+For production applications, it is recommended to freeze the `uhttpd` bytecode to your firmware image.  The step-by-step details for building micropython firmware images is outside of the scope of this document, but essentially, all you need to do is:
+
+* Copy (or symlink) the `uhttpd` python modules to the `modules` directory of your `micropython/esp8266` directory
+* Build and deploy your firmware image as described in the [micropython](https://github.com/micropython/micropython/tree/master/esp8266) instructions
+
+### Pre-compiled modules
+
+If you are doing any development on the `uhttpd` source code, you can reduce RAM usage by pre-compiling modules using the `mpy-cross` compiler, included in the [micropython](https://github.com/micropython/micropython/tree/master/esp8266) repository.
 
 Once you have the `mpy-cross` tool built, you can use the supplied `Makefile` to generate `.mpy` files.  Loading the generated bytecode files, instead of the python files, will reduce memory overhead during the development process of your application.
 
@@ -54,19 +68,20 @@ For example, to build the bytecode,
     prompt$ pwd
     /work/src/github/fadushin/esp8266/micropython
     prompt$ make
-    mpy-cross logging/ulog.py
-    mpy-cross logging/console_sink.py
-    mpy-cross logging/syslog_sink.py
-    mpy-cross uhttpd/uhttpd.py
-    mpy-cross uhttpd/http_file_handler.py
-    mpy-cross uhttpd/http_api_handler.py
-    mpy-cross uhttpd/stats_api.py
-    mpy-cross tools/ush.py
+    mpy-cross -o logging/ulog.mpy logging/ulog.py
+    mpy-cross -o logging/console_sink.mpy logging/console_sink.py
+    mpy-cross -o logging/syslog_sink.mpy logging/syslog_sink.py
+    mpy-cross -o uhttpd/uhttpd.mpy uhttpd/uhttpd.py
+    mpy-cross -o uhttpd/http_file_handler.mpy uhttpd/http_file_handler.py
+    mpy-cross -o uhttpd/http_api_handler.mpy uhttpd/http_api_handler.py
+    mpy-cross -o uhttpd/stats_api.mpy uhttpd/stats_api.py
+    mpy-cross -o tools/ush.mpy tools/ush.py
+    mpy-cross -o uhttpd/test/test_server.mpy uhttpd/test/test_server.py
 
 If you have `webrepl` running and `webrepl_cli.py` in your `PATH`, then you can upload the files you need to your device (adjusted of course for the IP address of your ESP8266), as follows:
 
     prompt$ export PATH=/Volumes/case-sensitive/webrepl:$PATH
-    prompt$ bin/upload.sh 192.168.1.180 logging/*.mpy uhttpd/*.mpy
+    prompt$ for i in $(find /*.mpy); do bin/upload.sh 192.168.1.180 $i; done
 
 The above command will use the `webrepl_cli.py` tool to upload the needed files to your ESP8266, using the `webrepl` server.
 
@@ -95,13 +110,13 @@ For example, to start the server with the file handler rooted off the `/www` pat
 
 You should then see some logs printed to the console, indicating that the server is listening for connections:
 
-    2000-01-01T08:09:15.005 [info] esp8266: TCP server started on 192.168.4.1:80
-    2000-01-01T08:09:15.005 [info] esp8266: TCP server started on 0.0.0.0:80
+    2016-12-18T09:57:46.005 [info] esp8266: uhttpd-master started.
 
 You may now connect to your ESP8266 via a web browser or curl and browse your file system, e.g.,
 
     prompt$ curl -i 'http://192.168.1.180/' 
     HTTP/1.1 200 OK
+    Server: uhttpd/master (running in your devices)
     Content-Length: 38
     Content-Type: text/html
     
@@ -115,7 +130,7 @@ The `uhttpd.Server` supports HTTP Basic authentication.  By default, HTTP authen
     >>> import http_file_handler
     >>> server = uhttpd.Server(
         [('/', http_file_handler.Handler('/www'))],
-        {'require_auth': True}
+        config={'require_auth': True}
     )
     >>> server.start()
 
@@ -144,6 +159,103 @@ When you supply the correct credentials (e.g., via `curl`), you should be grante
     Content-Type: text/html
     
     <html><body>Hello World!</body></html>
+
+
+## API Handlers
+
+The `uhttpd` server can be extended by implementing and instantiating API Handlers passed to the `http_api_handler.Handler` class constructor.  Doing so allows you to write REST-based APIs that allow your application to respond to application protocols of your own design.  For example, an application may need to control endpoints to which the embedded device communicates, and such configuration might be managed through a web console, which in turn might use a REST-based API to read and write configuration entries for the application.
+
+Messages and be sent to handlers via a combination of URLs, including query string parameters, as well as JSON or raw byte array messages in the body of an HTTP request and response.  Standard HTTP verbs, including "get", "put", "post", and "delete" are supported.  The underlying `http_api_handler.Handler` class manages the transformation of data from and to the `uhttpd.Server` class, so you can focus on the business needs of your application, and not on the details of the HTTP protocol.
+
+To implement an API Handler, all you need to do is define a class which implements one or more of the following operations:
+
+* `get(self, api_request)`
+* `put(self, api_request)`
+* `post(self, api_request)`
+* `delete(self, api_request)`
+
+The inputs, return values, and exception semantics for these operstions are defined in more detail below, but the basic idea is, "query parameters and JSON in, JSON out", but there are exceptions to this rule, if neeeded.
+
+You do not need to implement _all_ of these operations; only the operations your application needs to respond to.  If a client makes a request on an API Handler for an operation that is not defined, they will receive a bad request error (HTTP 400).
+
+The function names correspond in a predictable way to the corresponding verbs that define the HTTP protocol.  For example, if the HTTP request is a "GET" request, then the `get` function will be called on the corresponding handler.  Similarly for "PUT", "POST", and "DELETE".
+
+> Note.  Not all HTTP verbs are currently supported.
+
+### Example
+
+To install an API Handler, provide an instance of it to the `http_api_handler.Handler` constructor, which in turn is installed into the `uhttpd.Server`.  For example, if your API handler is called `Handler` and is defined in the `my_api.py` module:
+
+    # my_api.py
+    class Handler:
+        def __init__(self):
+            pass
+        
+        def get(self, api_request):
+            return {'foo': 'bar'}
+
+then you can install the API Handler as follows:
+
+    >>> import my_api
+    >>> import http_api_handler
+    >>> api_handler = http_api_handler.Handler([(['test'], my_api.Handler())])
+    >>> import uhttpd
+    >>> server = uhttpd.Server([('/api', api_handler)])
+    >>> server.start()
+    2016-12-18T10:24:33.005 [info] esp8266: uhttpd-master started.
+
+You can then make HTTP requests to your handler via:
+
+    prompt$ curl -i 'http://192.168.1.180/api/test
+    HTTP/1.1 200 OK
+    Server: uhttpd/master (running in your devices)
+    content-type: application/json
+    content-length: 14
+    
+    {"foo": "bar"}
+
+### Inputs
+
+The API handler method all take a single `api_request` parameter, which encapsulates the data present in the current request.  This parameter is a dictionary containing elements that have been parsed off the HTTP request and TCP/IP connection.  In many cases, applications do not need to deeply inspect the contents of this object, but portions of its structure are needed for handling common requests.
+
+The entries of an HTTP request structure include the following keys:
+
+* `'prefix'` The prefix used to identify the API handler.  For example, if the API handler is registered with the `http_api_handler.Hander` using the prefix ['demo'], then the `'prefix'` value will be `['demo']`.
+* `'context'`  This entry contains a list of path components in the HTTP request after the prefix.  For example, if the API handler is registered with the `http_api_handler.Hander` using the prefix ['demo'], and the `http_api_handler.Handler` is registered with the `uhttpd.Server` class with the prefix `/api`, when the HTTP request is `/api/demo/foo/bar`, the `'context'` entry will contain the list `['foo', 'bar']`.
+* `'query_params'`  This entry contains a dictionary containing any query parameters that were delivered with the request, as a set of name-value pairs.  For example, if the HTTP request contains the path `/api/demo?foo=bar`, then the `'query_params'` entry will contain the dictionary `{'foo': "bar"}`.  The value of each query parameter is always of type string.
+* `'body'`  The body of the request as a parsed JSON structure, if it has been passed as JSON, and if the content type defined in the HTTP request is `application/json`.  Otherwise, this parameter is not defined.  See the `'http'` element for the raw bytes containing the HTTP body, if it has been provided.
+* `'http'`  This entry contains a dictionary containing elements parsed off the HTTP request.  More details of this object are described below.
+
+The `http` entry contains a dictionary of elements that have been parsed off the HTTP request.
+
+* `'verb'` The HTTP "verb" (e.g., "get", "put", "post", etc.)  The string value provided on the wire is converted to lower case.
+* `'path'`  The path, as it was specified in the HTTP request
+* `'protocol'` The HTTP protocol provided by the client (e.g., "HTTP/1.1")
+* `'prefix'`  This entry dentotes the prefix 
+* `'headers'` A dictionary containing the HTTP headers parsed from the HTTP request.  All keys in this dictionary are lower case.
+* `'body'`  The body of the request, as a byte array.  If no body is present in the request, then this entry is not defined.
+* `'tcp'` A dictionary containing properties of the client TCP/IP connection.
+
+The `tcp` entry contains the following elements:
+
+* `'remote_addr'` The remote address of the HTTP client
+
+### Return value
+
+The return value from these operations is a JSON structure (i.e., python Dictionary) that can be converted to a JSON string, a raw byte array, or `None`.  If the return value is None, no response is returned to client.  If the return value is a raw byte array, the value is returned in the body of the HTTP response with the content type `text/plain`.  Otherwise, the returned dictionary is transformed into a JSON string and is returned to the client.  The content type in the HTTP response is set to `application/json`.
+
+### Exception Semantics
+
+Handlers will generally return a JSON structure representing a response.  If, however, an error occurs in processing a request, the Handler may raise an exception, which will get processed by the underlying HTTP server, and an appropriate reponse code will be returned to the caller.
+
+Raising the following exceptions will generate the corresponding error codes back to the client:
+
+* `uhttpd.BadRequestException`: 400
+* `uhttpd.NotFoundException`: 404
+* `uhttpd.ForbiddenException`: 403
+
+Any other exception extending `BaseException` will generate an internal server errro (500)
+
 
 ## Reference
 
@@ -182,9 +294,17 @@ The `uhttpd.Server` can be configured using the `config` parameter at constructi
 
 The valid entries for this configuration parameter are described in detail below.
 
+##### `bind_addr`
+
+This parameter denotes the network interface on which the `uhttpd` should listen.  The type of this paramter is `string`, and the default value is `0.0.0.0`, meaning all interfaces.
+
 ##### `port`
 
 This parameter denotes the TCP/IP port on which the `uhttpd` should listen.  The type of this paramter is `int`, and the default value is 80.
+
+##### `timeout`
+
+This parameter denotes the maximum timeout on a connection before a connection is closed.  The type of this paramter is `int` and the units are indicated in seconds.  The default value is 30 (seconds).
 
 ##### `require_auth`
 
@@ -261,9 +381,11 @@ This way, any HTTP requests under `http://host/api` get directed to the HTTP API
 
 The HTTP API Handler, like the `uhttp.Server`, does not do much processing on the request, but instead uses the HTTP path to locate the first API Handler that matches the sequence of components provided in the constructor.  In the above example, a request to `http://host/api/foo/` would get processed by the `api1` handler (as would requests to `http://host/api/foo/bar`), whereas requests simply to `http://host/api/` would get procecced by the `api3` handler.
 
+For more information about API Handlers, see the _Writing API Handlers_ section, below.
+
 ### `stats_api.Handler`
 
-This package includes one HTTP API Handler instance, which can be used to retrieve runtime statistics from the ESP8266 device.  This API is largely for demonstration purposes, but it can also be used as part of an effort to build a Web UI to manage an ESP8266 device.
+This package includes one HTTP API Handler instance, which can be used to retrieve runtime statistics from the ESP8266 device.  This API is largely for demonstration purposes, but it can also be used as basis for building a Web UI to manage an ESP8266 device.
 
 Here is a complete example of construction of a server using this handler:
 
@@ -277,7 +399,7 @@ Here is a complete example of construction of a server using this handler:
         ])
     >>> import uhttpd
     >>> server = uhttpd.Server([
-            ('/api', file_handler)
+            ('/api', api_handler),
             ('/', file_handler)
         ])
 

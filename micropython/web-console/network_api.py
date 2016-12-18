@@ -35,79 +35,15 @@ class Handler:
     # callbacks
     #
 
-    def get(self, api_request):
-        components = api_request['context']
-        full_response = self.get_response()
-        return self.extract_response(components, full_response)
+    def get(self, components, _request):
+        return self.get_network_stats()
+
+    def post(self, components, _request):
+        return self.get_network_stats()
 
     #
     # internal operations
     #
-
-    def get_response(self):
-        return {
-            'sys': self.get_sys_stats(),
-            'machine': self.get_machine_stats(),
-            'esp': self.get_esp_stats(),
-            'gc': self.get_gc_stats(),
-            'network': self.get_network_stats()
-        }
-
-    def get_sys_stats(self):
-        import sys
-        implementation = sys.implementation
-        return {
-            'byteorder': sys.byteorder,
-            'implementation': {
-                'name': implementation[0],
-                'version': implementation[1]
-            },
-            'maxsize': sys.maxsize,
-            'modules': self.keys(sys.modules),
-            'path': sys.path,
-            'platform': sys.platform,
-            'version': sys.version,
-            'vfs': self.get_vfs_stats()
-        }
-
-    def get_vfs_stats(self):
-        import os
-        stats = os.statvfs('/')
-        return {
-            'frsize': stats[1],
-            'blocks': stats[2],
-            'bavail': stats[4]
-        }
-
-    def keys(self, pairs):
-        ret = []
-        for k, v in pairs.items():
-            ret.append(k)
-        return ret
-
-    def get_machine_stats(self):
-        import machine
-        import ubinascii
-        id = "0x{}".format(ubinascii.hexlify(machine.unique_id()).decode().upper())
-        return {
-            'freq': machine.freq(),
-            'unique_id': id
-        }
-
-    def get_esp_stats(self):
-        import esp
-        return {
-            'flash_id': esp.flash_id(),
-            'flash_size': esp.flash_size(),
-            'free_mem': esp.freemem()
-        }
-
-    def get_gc_stats(self):
-        import gc
-        return {
-            'mem_alloc': gc.mem_alloc(),
-            'mem_free': gc.mem_free()
-        }
 
     def get_network_stats(self):
         return {
@@ -181,24 +117,3 @@ class Handler:
             return 'STAT_GOT_IP'
         else:
             return "Unknown wlan status: {}".format(status)
-
-    def extract_response(self, components, js):
-        ret = js
-        for component in components:
-            if component in ret:
-                ret = ret[component]
-            else:
-                raise uhttpd.NotFoundException(components)
-        return ret
-
-    def get_phy_mode(self):
-        phy_mode = network.phy_mode()
-        if phy_mode == network.MODE_11B:
-            return 'MODE_11B'
-        elif phy_mode == network.MODE_11G:
-            return 'MODE_11G'
-        elif phy_mode == network.MODE_11N:
-            return 'MODE_11N'
-        else:
-            return "Unknown phy_mode: {}".format(phy_mode)
-

@@ -46,70 +46,56 @@ class Handler:
     # callbacks
     #
 
-    def handle_request(self, request):
+    def handle_request(self, http_request):
         #
         # We only support GET
         #
-        verb = request['verb']
-        if verb.lower() != 'get':
-            return self.create_message_response(
-                500, "Unsupported verb: {}".format(verb)
-            )
+        logger.debug("request: %s", http_request)
+        verb = http_request['verb']
+        if verb != 'get':
+            raise uhttpd.BadRequestException("Unsupported HTTP verb: {}".format(verb))
+        # the relative path is the path on the HTTP request stripped of the
+        # prefix used to register the file handler
+        relative_path = uhttpd.get_relative_path(http_request)
+        # the effective path is the relative path with the root path
+        # prefixed, and normalized to remove '.' and '..'
+        absolute_path = self.effective_path(relative_path)
+        #
+        # If the path is forbidden, 403 out
+        #
+        remote_addr = http_request['tcp']['remote_addr']
+        if not self.is_prefix(self._root_path, absolute_path):
+            logger.info(
+                "FORBIDDEN {} {}".format(remote_addr, absolute_path))
+            raise uhttpd.ForbiddenException(absolute_path)
         #
         # If the path doesn't exist, 404 out
         #
-        path = request['path']
-        full_path = "{}{}".format(self._root_path, path).rstrip('/')
-        if not self.exists(full_path):
+        if not self.exists(absolute_path):
             logger.info(
-                "NOT_FOUND {} {}".format(request['remote_addr'], full_path))
-            raise uhttpd.NotFoundException(full_path)
+                "NOT_FOUND {} {}".format(remote_addr, absolute_path))
+            raise uhttpd.NotFoundException(absolute_path)
         #
         # Otherwise, generate a file listing or a file
         #
-        if self.is_dir(full_path):
-            logger.debug("{} is a directory.".format(full_path))
-            index_path = full_path + "/index.html"
+        if self.is_dir(absolute_path):
+            logger.debug("{} is a directory.".format(absolute_path))
+            index_path = absolute_path + "/index.html"
             if self.exists(index_path):
                 response = self.create_file_response(index_path)
-                logger.info(
-                    "ACCESS {} {}".format(request['remote_addr'], index_path))
+                logger.info("ACCESS {} {}".format(remote_addr, index_path))
                 return response
             else:
-                logger.info(
-                    "ACCESS {} {}".format(request['remote_addr'], full_path))
-                return self.create_dir_listing_response(full_path, path)
+                logger.info("ACCESS {} {}".format(remote_addr, absolute_path))
+                prefix = http_request['prefix']
+                return self.create_dir_listing_response(absolute_path)
         else:
-            logger.info(
-                "ACCESS {} {}".format(request['remote_addr'], full_path))
-            return self.create_file_response(full_path)
-
-    def module(self):
-        return 'http_file_handler'
+            logger.info("ACCESS {} {}".format(remote_addr, absolute_path))
+            return self.create_file_response(absolute_path)
 
     #
     # internal operations
     #
-
-    def is_dir(self, path):
-        try:
-            os.listdir(path)
-            return True
-        except OSError:
-            return False
-
-    def exists(self, path):
-        try:
-            os.stat(path)
-            return True
-        except OSError:
-            return False
-
-    def create_message_response(self, code, message):
-        data = "<html><body>{}</body></html>".format(message).encode('UTF-8')
-        length = len(data)
-        body = lambda stream: stream.write(data)
-        return self.create_response(code, "text/html", length, body)
 
     def create_file_response(self, path):
         length, body = self.generate_file(path)
@@ -123,37 +109,21 @@ class Handler:
     def generate_file(self, path):
         f = open(path, 'r')
         serializer = lambda stream: self.stream_file(stream, f)
-        return (self.file_size(path), serializer)
+        return self.file_size(path), serializer
 
-    def create_dir_listing_response(self, full_path, path):
-        length, body = self.generate_dir_listing(path, os.listdir(full_path))
-        return self.create_response(200, "text/html", length, body)
+    def create_buffer(self):
+        size = self._block_size
+        while True:
+            if size < 1:
+                raise Exception("Unable to allocate buffer")
+            try:
+                return bytearray(size)
+            except MemoryError:
+                size //= 2
 
-    def generate_dir_listing(self, path, files):
-        data = "<html><body><header><em>uhttpd/{}</em><hr></header><h1>{}</h1><ul>".format("pre-0.1", path)
-        if path != '/':
-            components = path.strip('/').split('/')
-            components = components[:len(components)-1]
-            data += "<li><a href=\"{}\">..</a></li>\n".format("/{}".format("/".join(components)))
-        for f in files:
-            data += "<li><a href=\"{}\">{}</a></li>\n".format(path[1:] + '/' + f, f)
-        data += "</ul></body></html>"
-        data = data.encode('UTF-8')
-        body = lambda stream: stream.write(data)
-        return (len(data), body)
-
-    def create_response(self, code, content_type, length, body):
-        return {
-            'code': code,
-            'headers': {
-                'Content-Type': content_type,
-                'Content-Length': length
-            },
-            'body': body
-        }
 
     def stream_file(self, stream, f):
-        buf = bytearray(self._block_size)
+        buf = self.create_buffer()
         while True:
             n = f.readinto(buf)
             if n:
@@ -161,9 +131,104 @@ class Handler:
             else:
                 break
 
-    def file_size(self, path):
+    def effective_path(self, path):
+        full_path = "{}/{}".format(self._root_path, path).rstrip('/')
+        components = full_path.split('/')
+        tmp = []
+        for component in components:
+            if component == '':
+                pass
+            elif component == "..":
+                tmp = tmp[:len(tmp) - 1]
+            elif component == '.':
+                pass
+            else:
+                tmp.append(component)
+        return "/{}".format('/'.join(tmp))
+
+    @staticmethod
+    def is_dir(path):
+        try:
+            os.listdir(path)
+            return True
+        except OSError:
+            return False
+
+    @staticmethod
+    def exists(path):
+        try:
+            os.stat(path)
+            return True
+        except OSError:
+            return False
+
+    @staticmethod
+    def create_message_response(code, message):
+        data = "<html><body>{}</body></html>".format(message).encode('UTF-8')
+        length = len(data)
+        body = lambda stream: stream.write(data)
+        return Handler.create_response(code, "text/html", length, body)
+
+    def create_dir_listing_response(self, absolute_path):
+        print("full_path: {}".format(absolute_path))
+        length, body = self.generate_dir_listing(absolute_path)
+        return self.create_response(200, "text/html", length, body)
+
+    def generate_dir_listing(self, absolute_path):
+        path = absolute_path[len(self._root_path):]
+        if not path:
+            path = '/'
+        data = "<html><body><header><em>uhttpd/{}</em><hr></header><h1>{}</h1><ul>".format(uhttpd.VERSION, path)
+        components = self.components(path)
+        components_len = len(components)
+        if components_len > 0:
+            data += "<li><a href=\"{}\">..</a></li>\n".format(self.to_path(components[:components_len-1]))
+        files = os.listdir(absolute_path)
+        for f in files:
+            tmp = components.copy()
+            tmp.append(f)
+            data += "<li><a href=\"{}\">{}</a></li>\n".format(self.to_path(tmp), f)
+        data += "</ul></body></html>"
+        data = data.encode('UTF-8')
+        body = lambda stream: stream.write(data)
+        return len(data), body
+
+    def to_path(self, components):
+        return "/{}".format("/".join(components))
+
+    def components(self, path):
+        f = lambda e: e != ''
+        return self.filter(
+            f, path.strip('/').split('/')
+        )
+
+    def filter(self, f, el):
+        ret = []
+        for e in el:
+            if f(e):
+                ret.append(e)
+        return ret
+
+    @staticmethod
+    def create_response(code, content_type, length, body):
+        return {
+            'code': code,
+            'headers': {
+                'content-type': content_type,
+                'content-length': length
+            },
+            'body': body
+        }
+
+    @staticmethod
+    def file_size(path):
         return os.stat(path)[6]
 
-    def get_suffix(self, path):
+    @staticmethod
+    def get_suffix(path):
         idx = path.rfind('.')
         return "" if idx == -1 else path[idx:]
+
+    @staticmethod
+    def is_prefix(prefix, str):
+        return len(prefix) <= len(str) and str[:len(prefix)] == prefix

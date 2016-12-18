@@ -38,14 +38,15 @@ UHTTPD_MODULES=\
 TOOL_MODULES=\
 	tools/ush.py
 
-OUTPUTS=$(patsubst %.py, %.mpy, $(LOGGING_MODULES) $(UHTTPD_MODULES) $(TOOL_MODULES))
+TEST_MODULES=\
+	uhttpd/test/test_server.py
+
+OUTPUTS=$(patsubst %.py, %.mpy, $(LOGGING_MODULES) $(UHTTPD_MODULES) $(TOOL_MODULES) $(TEST_MODULES))
 
 all: $(OUTPUTS)
 
 clean:
-	rm logging/*.mpy
-	rm uhttpd/*.mpy
-	rm tools/*.mpy
+	rm -f $(OUTPUTS)
 
 %.mpy: %.py
-	mpy-cross $<
+	mpy-cross -o $@ $<

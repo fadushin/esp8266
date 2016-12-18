@@ -24,11 +24,12 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 import socket
-import network
 import micropython
 import sys
 from ulog import logger
 import gc
+
+VERSION = "master"
 
 
 class NotFoundException(Exception):
@@ -39,15 +40,27 @@ class BadRequestException(Exception):
     pass
 
 
+class ForbiddenException(Exception):
+    pass
+
+
+def get_relative_path(http_request):
+    path = http_request['path']
+    prefix = http_request['prefix']
+    return path[len(prefix):]
+
+
 class Server:
     def __init__(self, handlers, config={}):
         self._handlers = handlers
         self._config = self.update(self.default_config(), config)
         self._tcp_server = TCPServer(
+            bind_addr=self._config['bind_addr'],
             port=self._config['port'],
+            timeout=self._config['timeout'],
             handler=self,
-            use_ssl=self._config['use_ssl'])
-        self._version = "0.1"
+            use_ssl=self._config['use_ssl']
+        )
 
     #
     # API
@@ -55,51 +68,75 @@ class Server:
 
     def start(self):
         self._tcp_server.start()
+        logger.info("uhttpd-{} started.".format(VERSION))
 
     def stop(self):
         self._tcp_server.stop()
+        logger.info("uhttpd-{} stopped.".format(VERSION))
 
     #
     # Callbacks
     #
 
-    def handle_request(self, client_socket, remote_addr):
+    def handle_request(self, client_socket, tcp_request):
+        http_request = {
+            'tcp': tcp_request
+        }
         try:
             gc.collect()
             #
             # parse out the heading line, to get the verb, path, and protocol
             #
-            request = self.parse_heading(
+            heading = self.parse_heading(
                 self.readline(client_socket).decode('UTF-8'))
-            request['remote_addr'] = remote_addr
+            http_request.update(heading)
             #
             # find the handler for the specified path.  If we don't have
-            # one registered, raise a NotFoundException
+            # one registered, we raise a NotFoundException, but only after
+            # reading the payload.
             #
-            path = request['path']
+            path = http_request['path']
             handler = None
-            relative_path = None
             for prefix, h in self._handlers:
                 if path.startswith(prefix):
-                    relative_path = path[len(prefix):]
+                    #request['relative_path'] = path[len(prefix):]
+                    http_request['prefix'] = prefix
                     handler = h
                     logger.debug(
-                        "Found uhttpd handler {}".format(handler.module()))
+                        "Found uhttpd handler for prefix {}: {}".format(prefix, handler))
                     break
-            if not handler:
-                raise NotFoundException("No Handler for path {}".format(path))
-            request['relative_path'] = relative_path
             #
-            # Otherwise, parse out the headers
+            # Parse out the headers
             #
             headers = {}
+            num_headers = 0
             while True:
                 line = self.readline(client_socket)
                 if not line or line == b'\r\n':
                     break
-                k, v = self.parse_header(line.decode('UTF-8'))
+                k, v = Server.parse_header(line.decode('UTF-8'))
                 headers[k.lower()] = v
-            request['headers'] = headers
+                num_headers += 1
+                if num_headers > self._config['max_headers']:
+                    raise BadRequestException("Number of headers exceeds maximum allowable")
+            http_request['headers'] = headers
+            #
+            # If the headers have a content length, then read the body
+            #
+            content_length = 0
+            if 'content-length' in headers:
+                content_length = int(headers['content-length'])
+            if content_length > self._config['max_content_length']:
+                raise BadRequestException("Content size exceeds maximum allowable")
+            if content_length > 0:
+                body = client_socket.read(content_length)
+                http_request['body'] = body
+            #
+            # If there is no handler, then raise a NotFound exception
+            #
+            if not handler:
+                raise NotFoundException("No Handler for path {}".format(path))
+
             #
             # Authenticate the user, if configured to do so.  If required
             # and there is no authorization header, reply with a 401 and
@@ -110,32 +147,26 @@ class Server:
                 if not 'authorization' in headers:
                     return self.unauthorized_error(client_socket)
                 else:
+                    remote_addr = tcp_request['remote_addr']
                     if not self.is_authorized(headers['authorization']):
-                        logger.info("UNAUTHORIZED {}".format(request['remote_addr']))
+                        logger.info("UNAUTHORIZED {}".format(remote_addr))
                         return self.unauthorized_error(client_socket)
                     else:
-                        logger.info("AUTHORIZED {}".format(request['remote_addr']))
-            #
-            # If the headers have a content length, then read the body
-            #
-            content_length = 0
-            if 'Content-Length' in headers:
-                content_length = int(headers['Content-Length'])
-            if content_length > 0:
-                body = client_socket.read(content_length)
-                request['body'] = body
+                        logger.info("AUTHORIZED {}".format(remote_addr))
             #
             # get the response from the active handler and serialize it
             # to the socket
             #
-            response = handler.handle_request(request)
-            return self.response(client_socket, response)
+            response = handler.handle_request(http_request)
+            return Server.response(client_socket, response)
         except BadRequestException as e:
-            return self.bad_request_error(client_socket, e)
+            return Server.bad_request_error(client_socket, e)
+        except ForbiddenException as e:
+            return Server.forbidden_error(client_socket, e)
         except NotFoundException as e:
-            return self.not_found_error(client_socket, e)
+            return Server.not_found_error(client_socket, e)
         except BaseException as e:
-            return self.internal_server_error(client_socket, e)
+            return Server.internal_server_error(client_socket, e)
         finally:
             gc.collect()
 
@@ -143,54 +174,64 @@ class Server:
     # Internal operations
     #
 
-    def update(self, a, b):
+    @staticmethod
+    def update(a, b):
         a.update(b)
         return a
 
-    def default_config(self):
+    @staticmethod
+    def default_config():
         return {
+            'bind_addr': '0.0.0.0',
             'port': 80,
+            'timeout': 30,
             'require_auth': False,
             'realm': "esp8266",
             'user': "admin",
             'password': "uhttpD",
+            'max_headers': 10,
+            'max_content_length': 1024,
             # NB. SSL currently broken
             'use_ssl': False
         }
 
     def readline(self, client_socket):
         if self._config['use_ssl']:
-            import uio
-            buf = uio.BytesIO()
-            in_newline = False
-            done = False
-            while not done:
-                b = client_socket.read(1)
-                buf.write(b)
-                #print(buf.getvalue())
-                if in_newline:
-                    if b == b'\n':
-                        done = True
-                    else:
-                        in_newline = False
-                elif b == b'\r':
-                    in_newline = True
-            return buf.getvalue()
+            #import uio
+            #buf = uio.BytesIO()
+            #in_newline = False
+            #done = False
+            #while not done:
+            #    b = client_socket.read(1)
+            #    buf.write(b)
+            #    #print(buf.getvalue())
+            #    if in_newline:
+            #        if b == b'\n':
+            #            done = True
+            #        else:
+            #            in_newline = False
+            #    elif b == b'\r':
+            #        in_newline = True
+            #return buf.getvalue()
+            #  TODO
+            raise Exception("SSL unsupported")
         else:
             return client_socket.readline()
 
-    def parse_heading(self, line):
+    @staticmethod
+    def parse_heading(line):
         ra = line.split()
         try:
             return {
-                'verb': ra[0],
+                'verb': ra[0].lower(),
                 'path': ra[1],
                 'protocol': ra[2]
             }
         except:
             raise BadRequestException()
 
-    def parse_header(self, line):
+    @staticmethod
+    def parse_header(line):
         ra = line.split(":")
         return (ra[0].strip(), ra[1].strip())
 
@@ -209,19 +250,24 @@ class Server:
         except Exception as e:
             raise BadRequestException(e)
 
-    def server_name(self):
-        return "uhttpd/{} (running in your devices)".format(self._version)
+    @staticmethod
+    def server_name():
+        return "uhttpd/{} (running in your devices)".format(VERSION)
 
-    def format_heading(self, code):
-        return "HTTP/1.1 {} {}".format(code, self.lookup_code(code))
+    @staticmethod
+    def format_heading(code):
+        return "HTTP/1.1 {} {}".format(code, Server.lookup_code(code))
 
-    def lookup_code(self, code):
+    @staticmethod
+    def lookup_code(code):
         if code == 200:
             return "OK"
-        elif code == 40:
+        elif code == 400:
             return "Bad Request"
         elif code == 401:
             return "Unauthorized"
+        elif code == 403:
+            return "Forbidden"
         elif code == 404:
             return "Not Found"
         elif code == 500:
@@ -229,24 +275,27 @@ class Server:
         else:
             return "Unknown"
 
-    def format_headers(self, headers):
+    @staticmethod
+    def format_headers(headers):
         ret = ""
         for k, v in headers.items():
             ret += "{}: {}\r\n".format(k, v)
         return ret
 
-    def response(self, client_socket, response):
-        self.serialize(client_socket, response)
+    @staticmethod
+    def response(client_socket, response):
+        Server.serialize(client_socket, response)
         return (True, None)
 
-    def serialize(self, stream, response):
+    @staticmethod
+    def serialize(stream, response):
         #
         # write the heading and headers
         #
         stream.write("{}\r\n{}\r\n".format(
-            self.format_heading(response['code']),
-            self.format_headers(self.update(
-                response['headers'], {'Server': self.server_name()}
+            Server.format_heading(response['code']),
+            Server.format_headers(Server.update(
+                response['headers'], {'Server': Server.server_name()}
             ))
         ).encode('UTF-8'))
         #
@@ -254,72 +303,85 @@ class Server:
         #
         if 'body' in response:
             body = response['body']
-            body(stream)
+            if body:
+                body(stream)
 
     def unauthorized_error(self, client_socket):
         headers = {
             'www-authenticate': "Basic realm={}".format(self._config['realm'])
         }
-        return self.error(client_socket, 401, "Unauthorized", None, headers)
+        return Server.error(client_socket, 401, "Unauthorized", None, headers)
 
-    def bad_request_error(self, client_socket, e):
+    @staticmethod
+    def bad_request_error(client_socket, e):
         error_message = "Bad Request {}:".format(e)
-        return self.error(client_socket, 400, error_message, e)
+        return Server.error(client_socket, 400, error_message, e)
 
-    def not_found_error(self, client_socket, e):
+    @staticmethod
+    def forbidden_error(client_socket, e):
+        error_message = "Forbidden {}:".format(e)
+        return Server.error(client_socket, 403, error_message, e)
+
+    @staticmethod
+    def not_found_error(client_socket, e):
         error_message = "Not Found: {}".format(e)
-        return self.error(client_socket, 404, error_message, e)
+        return Server.error(client_socket, 404, error_message, e)
 
-    def internal_server_error(self, client_socket, e):
+    @staticmethod
+    def internal_server_error(client_socket, e):
+        sys.print_exception(e)
         error_message = "Internal Server Error: {}".format(e)
-        return self.error(client_socket, 500, error_message, e)
+        return Server.error(client_socket, 500, error_message, e)
 
-    def error(self, client_socket, code, error_message, e, headers={}):
-        logger.debug(error_message)
-        ef = lambda stream: self.stream_error(stream, error_message, e)
-        response = self.generate_error_response(code, ef, headers)
-        return self.response(client_socket, response)
+    @staticmethod
+    def error(client_socket, code, error_message, e, headers={}):
+        logger.debug("An error occurred processing a request.  Error code: {}  Error message: {}".format(code, error_message))
+        ef = lambda stream: Server.stream_error(stream, error_message, e)
+        response = Server.generate_error_response(code, ef, headers)
+        return Server.response(client_socket, response)
 
-    def stream_error(self, stream, error_message, e):
+    @staticmethod
+    def stream_error(stream, error_message, e):
         stream.write(error_message)
         if e:
             stream.write('<pre>')
-            stream.write(self.stacktrace(e))
+            stream.write(Server.stacktrace(e))
             stream.write('</pre>')
 
-    def stacktrace(self, e):
+    @staticmethod
+    def stacktrace(e):
         import uio
         buf = uio.BytesIO()
         sys.print_exception(e, buf)
         return buf.getvalue()
 
-    def generate_error_response(self, code, ef, headers={}):
+    @staticmethod
+    def generate_error_response(code, ef, headers={}):
         data1 = '<html><body><header>uhttpd/{}<hr></header>'.format(
-            self._version).encode('UTF-8')
+            VERSION).encode('UTF-8')
         # message data in ef will go here
         data2 = '</body></html>'.encode('UTF-8')
-        body = lambda stream: self.write_html(stream, data1, ef, data2)
+        body = lambda stream: Server.write_html(stream, data1, ef, data2)
         return {
             'code': code,
-            'headers': self.update({
-                'Content-Type': "text/html",
+            'headers': Server.update({
+                'content-type': "text/html",
             }, headers),
             'body': body
         }
 
-    def write_html(self, stream, data1, ef, data2):
+    @staticmethod
+    def write_html(stream, data1, ef, data2):
         stream.write(data1)
         ef(stream)
         stream.write(data2)
 
 
 SO_REGISTER_HANDLER = const(20)
-CONNECTION_TIMEOUT = const(30)
-
 
 class TCPServer:
     def __init__(self, port, handler, bind_addr='0.0.0.0',
-                 timeout=CONNECTION_TIMEOUT, use_ssl=False):
+                 timeout=30, use_ssl=False):
         self._port = port
         self._handler = handler
         self._bind_addr = bind_addr
@@ -328,10 +390,9 @@ class TCPServer:
         self._server_socket = None
         self._client_socket = None
 
-    def handle_receive(self, client_socket, remote_addr):
+    def handle_receive(self, client_socket, tcp_request):
         try:
-            done, response = self._handler.handle_request(client_socket,
-                                                          remote_addr)
+            done, response = self._handler.handle_request(client_socket, tcp_request)
             if response and len(response) > 0:
                 logger.debug(
                     "A non-zero response was returned from the utcp_server handler")
@@ -359,7 +420,10 @@ class TCPServer:
             import ussl
             client_socket = ussl.wrap_socket(client_socket, server_side=True)
             logger.debug("Connection will use SSL")
-        while self.handle_receive(client_socket, remote_addr):
+        tcp_request = {
+            'remote_addr': remote_addr
+        }
+        while self.handle_receive(client_socket, tcp_request):
             pass
 
     def start(self):
@@ -375,19 +439,6 @@ class TCPServer:
         self._server_socket.listen(0)
         self._server_socket.setsockopt(socket.SOL_SOCKET, SO_REGISTER_HANDLER,
                                        self.handle_accept)
-        #
-        # Report the interfaces on which we are listening
-        #
-        ap = network.WLAN(network.AP_IF)
-        if ap.active():
-            ifconfig = ap.ifconfig()
-            logger.info(
-                "TCP server started on {}:{}".format(ifconfig[0], self._port))
-        sta = network.WLAN(network.STA_IF)
-        if sta.active():
-            ifconfig = sta.ifconfig()
-            logger.info(
-                "TCP server started on {}:{}".format(ifconfig[0], self._port))
 
     def stop(self):
         if self._client_socket:
