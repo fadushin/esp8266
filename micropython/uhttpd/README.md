@@ -4,20 +4,20 @@ This set of modules provides a simple HTTP framework and server, providing an HT
 
 Features include:
 
-* Support for a strict subset of the HTTP/1.1 protocol (RFC 2616)
+* Support for a subset of the HTTP/1.1 protocol (RFC 2616)
 * Asynchronous handling of requests, so that the server can run while the ESP8266 runs other tasks
 * Support for HTTP/Basic authentication
 * Handler for servicing files on the Micropython file system
 * Extensible API for adding REST-ful JSON and query-based APIs
 
 
-By itself, the `uhttpd` module is just a TCP server and framework for adding handlers to process HTTP requests.  The actual servicing of HTTP requests is done by installing handlers, which are passed to the `uhttpd` server at creation time.  It's the handlers that actually do the heavy lifting when it comes to servicing HTTP requests.  Handlers are triggered based on the URLs that are used by the client.  Multiple handlers can be installed, each of which can handle a special case based on a particular URL prefix.
+By itself, the `uhttpd` module is just a TCP server and framework for adding handlers to process HTTP requests.  The actual servicing of HTTP requests is done by installing HTTP Request handlers, which are passed to the `uhttpd` server at creation time.  It's the Request Handlers that actually do the heavy lifting when it comes to servicing HTTP requests.  Request Handlers are triggered based on the URLs that are used by the client.  Multiple Request Handlers can be installed, each of which can handle a special case based on a particular URL prefix.
 
-This package includes handlers for servicing files on the micropython file system (e.g., HTML, Javascript, CSS, etc), as well as handlers for managing REST-ful API calls, essential components in any modern web-based application.
+This package includes a Request Handler for servicing files on the micropython file system (e.g., HTML, Javascript, CSS, etc), as well as a Request Handler for managing REST-ful API calls, essential components in any modern web-based application.  The API Request Handler in turns supports the addition of application-specific API Handlers, described in more detail below.
 
 Once started, the `uhttpd` server runs in the background, so that the ESP8266 can do other tasks.  When the server accepts a request, however, the ESP8266 will block for the period of time it takes to process the request, i.e., read and parse the request sent from the client, dispatch the parsed request to the designated handler to get a response, and send the response back to the client.  Ordinarily, this should only take a few milliseconds, but applications may vary in their request processing time.
 
-TCP/IP connections between clients and the `uhttpd` server endure for the duration of a single request.  Once the client opens a connection to the server, the server will dispatch the request to an appropriate handler and wait for the response from the handler.  It will then send the response back to the client on the open connection, and then close the connection from the client.
+TCP/IP connections between clients and the `uhttpd` server endure for the duration of a single request.  Once the client opens a connection to the server, the server will dispatch the request to an appropriate handler and wait for the response from the handler.  It will then send the response back to the client on the open connection, and then close the connection to the client.
  
 A driving design goal of this package is to have minimal impact on the ESP8266 device, itself, and to provide the tools that allow developers to implement rich client-side applications.  By design, web applications built with this framework should do as little work as possible on the server side, but should instead make use of modern web technologies to allow the web client or browser to perform significant parts of business logic.  In most cases, the web clients will have far more memory and compute resources than the ESP8266 device, itself, so it is wise to keep as much logic as possible on the client side.
 
@@ -34,7 +34,6 @@ The `uhttpd` framework and server is comprised the following python modules:
 * `uhttpd.py` -- provides HTTP server and framework
 * `http_file_handler.py` -- a file handler for the `uhttpd` server
 * `http_api_handler.py` -- a handler for servicing REST-ful APIs
-* `stats_api_handler` (optional) -- a demo API handler used to service run-time statistics about the device
 
 This module relies on the `ulog` facility, defined in the [logging](/micropython/logging) area of this repository.
 
@@ -49,7 +48,7 @@ Both frozen and pre-compiled bytecode require building the [micropython](https:/
 
 ### Frozen Bytecode (recommended)
 
-For production applications, it is recommended to freeze the `uhttpd` bytecode to your firmware image.  The step-by-step details for building micropython firmware images is outside of the scope of this document, but essentially, all you need to do is:
+For production applications, it is recommended to freeze the `uhttpd` bytecode to your firmware image.  The step-by-step details for building micropython firmware images are outside of the scope of this document, but essentially, all you need to do is:
 
 * Copy (or symlink) the `uhttpd` python modules to the `modules` directory of your `micropython/esp8266` directory
 * Build and deploy your firmware image as described in the [micropython](https://github.com/micropython/micropython/tree/master/esp8266) instructions
@@ -74,7 +73,8 @@ For example, to build the bytecode,
     mpy-cross -o uhttpd/uhttpd.mpy uhttpd/uhttpd.py
     mpy-cross -o uhttpd/http_file_handler.mpy uhttpd/http_file_handler.py
     mpy-cross -o uhttpd/http_api_handler.mpy uhttpd/http_api_handler.py
-    mpy-cross -o uhttpd/stats_api.mpy uhttpd/stats_api.py
+    mpy-cross -o uhttpd/demo/stats_api.mpy uhttpd/demo/stats_api.py
+    mpy-cross -o uhttpd/demo/my_api.mpy uhttpd/demo/my_api.py
     mpy-cross -o tools/ush.mpy tools/ush.py
     mpy-cross -o uhttpd/test/test_server.mpy uhttpd/test/test_server.py
 
@@ -108,7 +108,9 @@ For example, to start the server with the file handler rooted off the `/www` pat
     >>> server = uhttpd.Server([('/', http_file_handler.Handler('/www'))])
     >>> server.start()
 
-You should then see some logs printed to the console, indicating that the server is listening for connections:
+The above sequence of statements will start the `uhttp` server, listening on port 80.  Any HTTP requests beginning with the URL prefix '/' (viz., all requests) will be routed to the `http_file_handler.Handler`, which will service files on the micropython file system under the directory `/www`.  Attempts to read data outside of this path will fail with a 403 (forbidden) exception.
+
+Once the `uhttpd.Server` is started, you should then see some logs printed to the console, indicating that the server is listening for connections:
 
     2016-12-18T09:57:46.005 [info] esp8266: uhttpd-master started.
 
@@ -136,13 +138,13 @@ The `uhttpd.Server` supports HTTP Basic authentication.  By default, HTTP authen
 
 The default HTTP user name is `admin`, and the default password is `uhttpD`, but these values are configurable, as described in the _Configuration_ section, below.  This server only supports one username and password for each server instance.
 
-Warning: This software currently provides no transport-layer protection for your applications.  HTTP credentials, while obfuscated with BASE-64 encoding, per the HTTP 1.1 spec, are sent in plaintext, and are therefore accessible to malicious parties on your network.  AS WRITTEN, THIS SOFTWARE IS NOT INTENDED FOR USE IN AN UNTRUSTED NETWORK!
+> Warning: This software currently provides no transport-layer protection for your applications.  HTTP credentials, while obfuscated with BASE-64 encoding, per the HTTP 1.1 spec, are sent in plaintext, and are therefore accessible to malicious parties on your network.  AS WRITTEN, THIS SOFTWARE IS NOT INTENDED FOR USE IN AN UNTRUSTED NETWORK!
 
-For example, if you try to make a request without supplying HTTP Basic authentiction credentials (i.e., a username and password), your request will be rejected with an HTTP 401 error:
+If you try to make a request without supplying HTTP Basic authentiction credentials (i.e., a username and password), your request will be rejected with an HTTP 401 error:
 
-    curl -i 'http://192.168.1.180' 
+    prompt$ curl -i 'http://192.168.1.180' 
     HTTP/1.1 401 Unauthorized
-    Server: uhttpd/pre-0.1 (running in your devices)
+    Server: uhttpd/master (running in your devices)
     Content-Type: text/html
     www-authenticate: Basic realm=esp8266
     
@@ -152,18 +154,47 @@ If you use a web browser to access this page, you should get a popup window prom
 
 When you supply the correct credentials (e.g., via `curl`), you should be granted access to the requested URL:
 
-    curl -i -u admin:uhttpD 'http://192.168.1.180' 
+    prompt$ curl -i -u admin:uhttpD 'http://192.168.1.180' 
     HTTP/1.1 200 OK
-    Server: uhttpd/pre-0.1 (running in your devices)
+    Server: uhttpd/master (running in your devices)
     Content-Length: 40
     Content-Type: text/html
     
     <html><body>Hello World!</body></html>
 
+## HTTP File Handler
+
+This package includes a Request Handler, `http_file_handler.Handler` which when installed will service files on the ESP8266 file system, relative to a specified file system root path (e.g., `/www`).
+
+This Request Handler will display the contents of the path specified in the HTTP GET URL, relative to the specified root path.  If path refers to a file on the file system, the file contents are returned.  If the path refers to a directory, and the directory does not contain an `index.html` file, the directory contents are provided as a list of hyperlinks.  Otherwise, the request will result in a 404/Not Found HTTP error.
+
+The default root path for the `http_file_handler.Handler` is `/www`.  For example, the following constructor will result in a file handler that services files in and below the `/www` directory of the micropython file system:
+
+    >>> import http_file_handler
+    >>> file_handler = http_file_handler.Handler()
+
+Once your handler is created, you can then provide it to the `uhttpd.Server` constructor, providing the path prefix used to locate the handler at request time:
+
+    >>> import uhttpd
+    >>> server = uhttpd.Server([
+            ('/', file_handler)
+        ])
+
+> Important: The path prefix provided to the `uhttpd.Server` constructor is distinct from the root path provided to the `http_file_handler.Handler` constructor.  The former relates to the path specified in a given HTTP GET request and is used to pick out the handler to process the handler.  The latter is used to locate where, on the file system, to start looking for files and directories to serve.  If the root path is `/www` and the path in the HTTP request is `/foo/bar`, then the `http_file_handler.Handler` will look for `/www/foo/bar` on the micropython file system.
+
+You may of course specify a root path other than `/www` through the `http_file_handler.Handler` constructor, but the directory must exist, or an error will occur at the time of construction. 
+
+> Warning: If you specify the micropython file system root path (`/`) in the HTTP File Handler constructor, you may expose sensitive security information, such as the Webrepl password, through the HTTP interface.  This behavior is strongly discouraged.
+
+You may optionally specify the `block_size` as a parameter to the `http_file_handler.Handler` constructor.  This integer value (default: 1024) determines the size of the buffer to use when streaming a file back to the client.  Larger chunk sizes require more memory and may run into issues with memory.  Smaller chunk sizes may result in degradation in performance.
+
+This handler only supports HTTP GET requests.  Any other HTTP request verb will be rejected.
+
+This handler recognizes HTML (`text/html`), CSS (`text/css`), and Javascript (`text/javascript`) file endings, and will set the `content-type` header in the response, accordingly.  The `content-length` header will contain the length of the body.  Any file other than the above list of types is treated as `text/plain`
 
 ## API Handlers
 
-The `uhttpd` server can be extended by implementing and instantiating API Handlers passed to the `http_api_handler.Handler` class constructor.  Doing so allows you to write REST-based APIs that allow your application to respond to application protocols of your own design.  For example, an application may need to control endpoints to which the embedded device communicates, and such configuration might be managed through a web console, which in turn might use a REST-based API to read and write configuration entries for the application.
+The `uhttpd` server can be extended by implementing and instantiating API Handlers passed to the `http_api_handler.Handler` class constructor, an HTTP Request Handler.  Doing so allows you to write REST-based APIs that allow your application to respond to application protocols of your own design.  For example, an application may need to control endpoints to which the embedded device communicates, and such configuration might be managed through a web console, which in turn might use a REST-based API to read and write configuration entries for the application.
 
 Messages and be sent to handlers via a combination of URLs, including query string parameters, as well as JSON or raw byte array messages in the body of an HTTP request and response.  Standard HTTP verbs, including "get", "put", "post", and "delete" are supported.  The underlying `http_api_handler.Handler` class manages the transformation of data from and to the `uhttpd.Server` class, so you can focus on the business needs of your application, and not on the details of the HTTP protocol.
 
@@ -263,7 +294,7 @@ The following sections describe the components that form the `uhttpd` package in
 
 ### `uhttpd.Server`
 
-The `uhttpd.Server` is simply a container for helper instances.  Its only job is to accept connections from clients, to read and parse HTTP headers, and to read the body of the request, if present.  The server will the dispatch the request to the first handler that matches the path indicated in the HTTP request, and wait for a response.  Once received, the response will be sent back to the caller.
+The `uhttpd.Server` is simply a container for HTTP Request Handlers.  Its only job is to accept connections from clients, to read and parse HTTP headers, and to read the body of the request, if present.  The server will the dispatch the request to the first handler that matches the path indicated in the HTTP request, and wait for a response.  Once received, the response will be sent back to the caller.
 
 An instance of a `uhttpd.Server` is created using an ordered list of pairs, where the first element of the pair is a path prefix, and the second is a handler index.  When an HTTP request is processed, the server will select the handler that corresponds with the first path prefix which is a prefix of the path in the HTTP request.
 
@@ -327,12 +358,15 @@ This parameter denotes the HTTP password, which needs to be supplied by the user
 
 The `http_file_handler.Handler` request handler is designed to service files on the ESP8266 file system, relative to a specified file system root path (e.g., `/www`).
 
-This handler will display the contents of the path specified in the HTTP GET URL, relative to the specified root path.  If path refers to a file on the file system, the file contents are returned.  If the path refers to a directory, and the directory does not contain an `index.html` file, the directory contents are provided as a list of hyperlinks.  Otherwise, the request will result in a 404/Not Found HTTP error.
+This class supports the following properties at initialization:
 
-The default root path for the `http_file_handler.Handler` is `/www`.  For example, the following constructor will result in a file handler that expects HTTP artifacts to reside in the `/www` directory of the micropython file system:
+* `root_path`  (default: `"/www"`)  The root path from which to serve files.
+* `block_size`  (defualt: `1024`)  The size of the buffer used to stream files back to the client.  Use smaller buffer sizes to reduce the changes of memory allocation failures due to memory framentation.
+
+> Warning.  You should set `root_path` to a directory that does not contain sensitive security information, such as usernames or passwords used to access the device or for the device to reach external services.
 
     >>> import http_file_handler
-    >>> file_handler = http_file_handler.Handler()
+    >>> file_handler = http_file_handler.Handler(root_path='/www', blcok_size=128)
 
 Once your handler is created, you can then provide it to the `uhttpd.Server` constructor, providing the path prefix used to locate the handler at request time:
 
@@ -341,17 +375,7 @@ Once your handler is created, you can then provide it to the `uhttpd.Server` con
             ('/', file_handler)
         ])
 
-> Important: The path prefix provided to the `uhttpd.Server` constructor is distinct from the root path provided to the `http_file_handler.Handler` constructor.  The former relates to the path specified in a given HTTP GET request and is used to pick out the handler to process the handler.  The latter is used to locate where, on the file system, to start looking for files and directories to serve.  If the root path is `/www` and the path in the HTTP request is `/foo/bar`, then the `http_file_handler.Handler` will look for `/www/foo/bar` on the micropython file system.
-
-You may of course specify a root path other than `/www` through the `http_file_handler.Handler` constructor, but the directory must exist, or an error will occur at the time of construction. 
-
-> Warning: If you specify the micropython file system root path (`/`) in the HTTP file handler constructor, you may expose sensitive security information, such as the Webrepl password, through the HTTP interface.  This behavior is strongly discouraged.
-
-You may optionally specify the `block_size` as a parameter to the `http_file_handler.Handler` constructor.  This integer value (default: 1024) determines the size of the buffer to use when streaming a file back to the client.  Larger chunk sizes require more memory and may run into issues with memory.  Smaller chunk sizes may result in degradation in performance.
-
-This handler only supports HTTP GET requests.  Any other HTTP request verb will be rejected.
-
-This handler recognizes HTML (`text/html`), CSS (`text/css`), and Javascript (`text/javascript`) file endings, and will set the `content-type` header in the response, accordingly.  The `content-length` header will contain the length of the body.  Any file other than the above list of types is treated as `text/plain`
+Typically, the HTTP File Handler should be defined last in the list of Request Handlers, with '/' as the first element of the tuple.  That way, specialized API handlers can get called based on paths known to your application (e.g., `/api`) and will not get serviced by the HTTP File handler.  To the contrary, the HTTP File handler can service HTML, CSS, and Javascript files, some of which may end up calling APIs in your application.
 
 ### `http_api_handler.Handler`
 

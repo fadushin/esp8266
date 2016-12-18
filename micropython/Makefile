@@ -33,7 +33,8 @@ UHTTPD_MODULES=\
 	uhttpd/uhttpd.py \
 	uhttpd/http_file_handler.py \
 	uhttpd/http_api_handler.py \
-	uhttpd/stats_api.py
+	uhttpd/demo/stats_api.py \
+	uhttpd/demo/my_api.py
 
 TOOL_MODULES=\
 	tools/ush.py
