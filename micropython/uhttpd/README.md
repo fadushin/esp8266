@@ -67,21 +67,21 @@ For example, to build the bytecode,
     prompt$ pwd
     /work/src/github/fadushin/esp8266/micropython
     prompt$ make
-    mpy-cross -o logging/ulog.mpy logging/ulog.py
-    mpy-cross -o logging/console_sink.mpy logging/console_sink.py
-    mpy-cross -o logging/syslog_sink.mpy logging/syslog_sink.py
-    mpy-cross -o uhttpd/uhttpd.mpy uhttpd/uhttpd.py
-    mpy-cross -o uhttpd/http_file_handler.mpy uhttpd/http_file_handler.py
-    mpy-cross -o uhttpd/http_api_handler.mpy uhttpd/http_api_handler.py
-    mpy-cross -o uhttpd/demo/stats_api.mpy uhttpd/demo/stats_api.py
-    mpy-cross -o uhttpd/demo/my_api.mpy uhttpd/demo/my_api.py
-    mpy-cross -o tools/ush.mpy tools/ush.py
-    mpy-cross -o uhttpd/test/test_server.mpy uhttpd/test/test_server.py
+    mpy-cross -o build/mpy/logging/ulog.mpy logging/ulog.py
+    mpy-cross -o build/mpy/logging/console_sink.mpy logging/console_sink.py
+    mpy-cross -o build/mpy/logging/syslog_sink.mpy logging/syslog_sink.py
+    mpy-cross -o build/mpy/uhttpd/uhttpd.mpy uhttpd/uhttpd.py
+    mpy-cross -o build/mpy/uhttpd/http_file_handler.mpy uhttpd/http_file_handler.py
+    mpy-cross -o build/mpy/uhttpd/http_api_handler.mpy uhttpd/http_api_handler.py
+    mpy-cross -o build/mpy/uhttpd/demo/stats_api.mpy uhttpd/demo/stats_api.py
+    mpy-cross -o build/mpy/uhttpd/demo/my_api.mpy uhttpd/demo/my_api.py
+    mpy-cross -o build/mpy/tools/ush.mpy tools/ush.py
+    mpy-cross -o build/mpy/uhttpd/test/test_server.mpy uhttpd/test/test_server.py
 
 If you have `webrepl` running and `webrepl_cli.py` in your `PATH`, then you can upload the files you need to your device (adjusted of course for the IP address of your ESP8266), as follows:
 
     prompt$ export PATH=/Volumes/case-sensitive/webrepl:$PATH
-    prompt$ for i in $(find /*.mpy); do bin/upload.sh 192.168.1.180 $i; done
+    prompt$ for i in $(find build/mpy -name \*.mpy); do bin/upload.sh 192.168.1.180 $i; done
 
 The above command will use the `webrepl_cli.py` tool to upload the needed files to your ESP8266, using the `webrepl` server.
 

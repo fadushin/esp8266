@@ -42,12 +42,14 @@ TOOL_MODULES=\
 TEST_MODULES=\
 	uhttpd/test/test_server.py
 
-OUTPUTS=$(patsubst %.py, %.mpy, $(LOGGING_MODULES) $(UHTTPD_MODULES) $(TOOL_MODULES) $(TEST_MODULES))
+MODULES=$(LOGGING_MODULES) $(UHTTPD_MODULES) $(TOOL_MODULES) $(TEST_MODULES)
+OUTPUTS=$(patsubst %.py, build/mpy/%.mpy, $(MODULES))
 
 all: $(OUTPUTS)
 
 clean:
-	rm -f $(OUTPUTS)
+	rm -rf build
 
-%.mpy: %.py
+build/mpy/%.mpy: %.py
+	@mkdir -p $(@D)
 	mpy-cross -o $@ $<

@@ -1,28 +1,28 @@
-"""
-Copyright (c) dushin.net  All Rights Reserved
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of dushin.net nor the
-      names of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY dushin.net ``AS IS'' AND ANY
-EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL dushin.net BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-"""
+#
+# Copyright (c) dushin.net  All Rights Reserved
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in the
+#      documentation and/or other materials provided with the distribution.
+#    * Neither the name of dushin.net nor the
+#      names of its contributors may be used to endorse or promote products
+#      derived from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY dushin.net ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL dushin.net BE LIABLE FOR ANY
+# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
 import socket
 import micropython
 import sys
@@ -102,8 +102,6 @@ class Server:
                     #request['relative_path'] = path[len(prefix):]
                     http_request['prefix'] = prefix
                     handler = h
-                    logger.debug(
-                        "Found uhttpd handler for prefix {}: {}".format(prefix, handler))
                     break
             #
             # Parse out the headers
@@ -196,27 +194,7 @@ class Server:
         }
 
     def readline(self, client_socket):
-        if self._config['use_ssl']:
-            #import uio
-            #buf = uio.BytesIO()
-            #in_newline = False
-            #done = False
-            #while not done:
-            #    b = client_socket.read(1)
-            #    buf.write(b)
-            #    #print(buf.getvalue())
-            #    if in_newline:
-            #        if b == b'\n':
-            #            done = True
-            #        else:
-            #            in_newline = False
-            #    elif b == b'\r':
-            #        in_newline = True
-            #return buf.getvalue()
-            #  TODO
-            raise Exception("SSL unsupported")
-        else:
-            return client_socket.readline()
+        return client_socket.readline()
 
     @staticmethod
     def parse_heading(line):
@@ -335,7 +313,6 @@ class Server:
 
     @staticmethod
     def error(client_socket, code, error_message, e, headers={}):
-        logger.debug("An error occurred processing a request.  Error code: {}  Error message: {}".format(code, error_message))
         ef = lambda stream: Server.stream_error(stream, error_message, e)
         response = Server.generate_error_response(code, ef, headers)
         return Server.response(client_socket, response)
@@ -394,32 +371,21 @@ class TCPServer:
         try:
             done, response = self._handler.handle_request(client_socket, tcp_request)
             if response and len(response) > 0:
-                logger.debug(
-                    "A non-zero response was returned from the utcp_server handler")
                 client_socket.write(response)
             if done:
-                logger.debug(
-                    "The utcp_server handler is done.  Closing socket.")
                 self.close(client_socket)
                 return False
             else:
-                logger.debug("The utcp_server handler is not done.")
                 self._client_socket = client_socket
                 return True
-        except Exception as e:
-            logger.error("Trapped exception '{}' on receive.".format(e))
-            sys.print_exception(e)
-            self.close(client_socket)
+        except:
+            client_socket.close()
+            self._client_socket = None
             return False
 
     def handle_accept(self, server_socket):
         client_socket, remote_addr = server_socket.accept()
-        logger.debug("Accepted connection from: {}".format(remote_addr))
         client_socket.settimeout(self._timeout)
-        if self._use_ssl:
-            import ussl
-            client_socket = ussl.wrap_socket(client_socket, server_side=True)
-            logger.debug("Connection will use SSL")
         tcp_request = {
             'remote_addr': remote_addr
         }
@@ -445,8 +411,3 @@ class TCPServer:
             self._client_socket.close()
         if self._server_socket:
             self._server_socket.close()
-
-    def close(self, socket_):
-        logger.debug("Closing socket {}".format(socket_))
-        socket_.close()
-        self._client_socket = None
