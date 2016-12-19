@@ -26,7 +26,7 @@
 import os
 import sys
 
-VERSION = "master"
+VERSION = "0.2"
 
 
 class Ush:

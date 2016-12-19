@@ -29,7 +29,7 @@ import sys
 from ulog import logger
 import gc
 
-VERSION = "master"
+VERSION = "0.2"
 
 
 class NotFoundException(Exception):
