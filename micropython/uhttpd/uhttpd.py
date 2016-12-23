@@ -23,7 +23,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-import socket
+import usocket
 import micropython
 import sys
 from ulog import logger
@@ -398,7 +398,7 @@ class TCPServer:
         # Start the listening socket.  Handle accepts asynchronously
         # in handle_accept/1
         #
-        self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._server_socket = usocket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,
                                        1)
         self._server_socket.bind((self._bind_addr, self._port))

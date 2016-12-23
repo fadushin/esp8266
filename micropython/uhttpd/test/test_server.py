@@ -23,12 +23,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-import os
+import uos
 import uhttpd
 
 def mkdir(path):
     try:
-        os.mkdir(path)
+        uos.mkdir(path)
     except OSError as e:
         pass
 
@@ -41,13 +41,13 @@ def write(filename, str):
 
 def init():
     print("Initializing...")
-    mkdir('/www')
-    write('/www/index.html', "<html><body>Hello World!</body></html>")
-    mkdir('/www/foo')
-    write('/www/foo/test.txt', "test")
-    mkdir('/www/foo/bar')
-    write('/www/foo/bar/test.js', "{'foo': \"bar\"}")
-    write('/www/foo/bar/test.css', "html")
+    mkdir('www')
+    write('www/index.html', "<html><body>Hello World!</body></html>")
+    mkdir('www/foo')
+    write('www/foo/test.txt', "test")
+    mkdir('www/foo/bar')
+    write('www/foo/bar/test.js', "{'foo': \"bar\"}")
+    write('www/foo/bar/test.css', "html")
 
 
 class TestAPIHandler:
@@ -92,7 +92,7 @@ def start():
     print("Starting test server ...")
     import uhttpd
     import http_file_handler
-    file_handler = http_file_handler.Handler()
+    file_handler = http_file_handler.Handler('www')
     import http_api_handler
     api_handler = http_api_handler.Handler(
         [(['test'], TestAPIHandler())]
