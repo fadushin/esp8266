@@ -147,10 +147,21 @@ class Handler:
     @staticmethod
     def is_dir(path):
         try:
-            uos.listdir(path)
+            Handler.listdir(path)
             return True
         except OSError:
             return False
+
+    @staticmethod
+    def listdir(path):
+        import sys
+        if sys.platform == 'esp8266':
+            return uos.listdir(path)
+        else:
+            ret = []
+            for name, size, modified in uos.ilistdir(path):
+                ret.append(name)
+            return ret
 
     @staticmethod
     def exists(path):
@@ -180,7 +191,7 @@ class Handler:
         components_len = len(components)
         if components_len > 0:
             data += "<li><a href=\"{}\">..</a></li>\n".format(self.to_path(components[:components_len-1]))
-        files = uos.listdir(absolute_path)
+        files = Handler.listdir(absolute_path)
         for f in files:
             tmp = components.copy()
             tmp.append(f)

@@ -393,17 +393,17 @@ class TCPServer:
             pass
 
     def start(self):
-        micropython.alloc_emergency_exception_buf(100)
+        #micropython.alloc_emergency_exception_buf(100)
         #
         # Start the listening socket.  Handle accepts asynchronously
         # in handle_accept/1
         #
-        self._server_socket = usocket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,
+        self._server_socket = usocket.socket(usocket.AF_INET, usocket.SOCK_STREAM)
+        self._server_socket.setsockopt(usocket.SOL_SOCKET, usocket.SO_REUSEADDR,
                                        1)
         self._server_socket.bind((self._bind_addr, self._port))
         self._server_socket.listen(0)
-        self._server_socket.setsockopt(socket.SOL_SOCKET, SO_REGISTER_HANDLER,
+        self._server_socket.setsockopt(usocket.SOL_SOCKET, SO_REGISTER_HANDLER,
                                        self.handle_accept)
 
     def stop(self):
