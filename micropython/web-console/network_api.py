@@ -35,11 +35,11 @@ class Handler:
     # callbacks
     #
 
-    def get(self, components, _request):
+    def get(self, api_request):
         return self.get_network_stats()
 
-    def post(self, components, _request):
-        return self.get_network_stats()
+    def post(self, api_request):
+        return None
 
     #
     # internal operations
@@ -117,3 +117,14 @@ class Handler:
             return 'STAT_GOT_IP'
         else:
             return "Unknown wlan status: {}".format(status)
+
+    def get_phy_mode(self):
+        phy_mode = network.phy_mode()
+        if phy_mode == network.MODE_11B:
+            return 'MODE_11B'
+        elif phy_mode == network.MODE_11G:
+            return 'MODE_11G'
+        elif phy_mode == network.MODE_11N:
+            return 'MODE_11N'
+        else:
+            return "Unknown phy_mode: {}".format(phy_mode)
