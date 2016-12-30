@@ -65,8 +65,12 @@ class Server:
     # API
     #
 
-    def start(self):
-        self._tcp_server.start()
+    def run(self):
+        logger.info("uhttpd-{} running...".format(VERSION))
+        self.start(False)
+
+    def start(self, background=True):
+        self._tcp_server.start(background)
         logger.info("uhttpd-{} started.".format(VERSION))
 
     def stop(self):
@@ -390,7 +394,7 @@ class TCPServer:
         while self.handle_receive(client_socket, tcp_request):
             pass
 
-    def start(self):
+    def start(self, background):
         #
         # Start the listening socket.  Handle accepts asynchronously
         # in handle_accept/1
@@ -399,7 +403,11 @@ class TCPServer:
         self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._server_socket.bind((self._bind_addr, self._port))
         self._server_socket.listen(self._backlog)
-        self._server_socket.setsockopt(socket.SOL_SOCKET, SO_REGISTER_HANDLER, self.handle_accept)
+        if background:
+            self._server_socket.setsockopt(socket.SOL_SOCKET, SO_REGISTER_HANDLER, self.handle_accept)
+        else:
+            while True:
+                self.handle_accept(self._server_socket)
 
     def stop(self):
         if self._client_socket:
