@@ -21,11 +21,13 @@ TCP/IP connections between clients and the `uhttpd` server endure for the durati
  
 A driving design goal of this package is to have minimal impact on the ESP8266 device, itself, and to provide the tools that allow developers to implement rich client-side applications.  By design, web applications built with this framework should do as little work as possible on the server side, but should instead make use of modern web technologies to allow the web client or browser to perform significant parts of business logic.  In most cases, the web clients will have far more memory and compute resources than the ESP8266 device, itself, so it is wise to keep as much logic as possible on the client side.
 
-> Warning: This software currently provides no transport-layer protection for your applications.  When this software is running, requests are sent in clear text, including not only the HTTP headers you may use for authentication, but also the contents of the HTTP requests and responses.  Malicious users on your network using off-the-shelf packet sniffers can read your HTTP traffic with no difficulty.  AS WRITTEN, THIS SOFTWARE IS NOT INTENDED FOR USE IN AN UNTRUSTED NETWORK!
+## Limitations
 
-The following work is planned for the future:
+While the `uhttpd` code is intended to be a robust HTTP server for many needs, there are currently some limitations users should be aware of:
 
-* Support for HTTP/S
+* There are currently limitations to the number of concurrent requests made on the server.  Many web browsers will attempt to run multiple connections to a given host, and will attemt to load resources (images, scripts, stylesheets, etc) in parallel.  The current implementation is unable to service requests in parallel, and many of the connections the web browser makes will get dropped, resulting in delays or inability to load page content.  You *might* be able to work around these limitations by in-lining as many of your scripts and resources as possible.
+* This software currently does not support SSL, and therefore provides no transport-layer protection for your applications.  When this software is running, requests are sent in clear text, including not only the HTTP headers you may use for authentication, but also the contents of the HTTP requests and responses.  Malicious users on your network using off-the-shelf packet sniffers can read your HTTP traffic with no difficulty.  AS WRITTEN, THIS SOFTWARE IS NOT INTENDED FOR USE IN AN UNTRUSTED NETWORK!
+* The amount of workable RAM is very limited on the ESP8266, on the order of 32k.  Users should design applications with this in mind.
 
 ## Modules and Dependencies
 
