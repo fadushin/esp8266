@@ -34,9 +34,23 @@ CONTENT_TYPE_MAP = {
 }
 
 
+def is_dir(path):
+    try:
+        os.listdir(path)
+        return True
+    except OSError:
+        return False
+
+def exists(path):
+    try:
+        os.stat(path)
+        return True
+    except OSError:
+        return False
+
 class Handler:
     def __init__(self, root_path='/www', block_size=1024):
-        if not self.exists(root_path) or not self.is_dir(root_path):
+        if not exists(root_path) or not is_dir(root_path):
             msg = "Root path {} is not an existing directory".format(root_path)
             raise Exception(msg)
         self._root_path = root_path
@@ -70,16 +84,16 @@ class Handler:
         #
         # If the path doesn't exist, 404 out
         #
-        if not self.exists(absolute_path):
+        if not exists(absolute_path):
             logger.info(
                 "NOT_FOUND {} {}".format(remote_addr, absolute_path))
             raise uhttpd.NotFoundException(absolute_path)
         #
         # Otherwise, generate a file listing or a file
         #
-        if self.is_dir(absolute_path):
+        if is_dir(absolute_path):
             index_path = absolute_path + "/index.html"
-            if self.exists(index_path):
+            if exists(index_path):
                 response = self.create_file_response(index_path)
                 logger.info("ACCESS {} {}".format(remote_addr, index_path))
                 return response
@@ -144,21 +158,6 @@ class Handler:
                 tmp.append(component)
         return "/{}".format('/'.join(tmp))
 
-    @staticmethod
-    def is_dir(path):
-        try:
-            os.listdir(path)
-            return True
-        except OSError:
-            return False
-
-    @staticmethod
-    def exists(path):
-        try:
-            os.stat(path)
-            return True
-        except OSError:
-            return False
 
     @staticmethod
     def create_message_response(code, message):

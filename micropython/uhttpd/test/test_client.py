@@ -26,7 +26,7 @@
 import unittest
 
 #host = "localhost"
-host = "192.168.1.180"
+host = "192.168.1.174"
 
 class Connection:
 
@@ -241,6 +241,23 @@ class HttpdTest(unittest.TestCase):
             self.assertEqual(get_header(response['headers'], 'content-type'), expected_content_type)
         if expected_body:
             self.assertEqual(response['body'], expected_body)
+
+
+    def test_concurrent_file(self):
+        import threading
+        threads = []
+        for i in range(3):
+            t = threading.Thread(target=self.get_test_js)
+            threads.append(t)
+            t.start()
+        for t in threads:
+            t.join()
+
+    def get_test_js(self):
+        import time
+        for i in range(10):
+            self.verify_get('/test/foo/bar/test.js', expected_status=200, expected_content_type='text/javascript', expected_body=b'{\'foo\': "bar"}')
+            #time.sleep(1)
 
 
 if __name__ == '__main__':

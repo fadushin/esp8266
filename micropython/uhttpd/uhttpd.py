@@ -24,7 +24,6 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 import socket
-import micropython
 import sys
 from ulog import logger
 import gc
@@ -59,7 +58,7 @@ class Server:
             port=self._config['port'],
             timeout=self._config['timeout'],
             handler=self,
-            use_ssl=self._config['use_ssl']
+            backlog=self._config['backlog']
         )
 
     #
@@ -189,8 +188,7 @@ class Server:
             'password': "uhttpD",
             'max_headers': 10,
             'max_content_length': 1024,
-            # NB. SSL currently broken
-            'use_ssl': False
+            'backlog': 5
         }
 
     def readline(self, client_socket):
@@ -358,12 +356,12 @@ SO_REGISTER_HANDLER = const(20)
 
 class TCPServer:
     def __init__(self, port, handler, bind_addr='0.0.0.0',
-                 timeout=30, use_ssl=False):
+                 timeout=30, backlog=5):
         self._port = port
         self._handler = handler
         self._bind_addr = bind_addr
         self._timeout = timeout
-        self._use_ssl = use_ssl
+        self._backlog = backlog
         self._server_socket = None
         self._client_socket = None
 
@@ -393,18 +391,15 @@ class TCPServer:
             pass
 
     def start(self):
-        micropython.alloc_emergency_exception_buf(100)
         #
         # Start the listening socket.  Handle accepts asynchronously
         # in handle_accept/1
         #
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,
-                                       1)
+        self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._server_socket.bind((self._bind_addr, self._port))
-        self._server_socket.listen(0)
-        self._server_socket.setsockopt(socket.SOL_SOCKET, SO_REGISTER_HANDLER,
-                                       self.handle_accept)
+        self._server_socket.listen(self._backlog)
+        self._server_socket.setsockopt(socket.SOL_SOCKET, SO_REGISTER_HANDLER, self.handle_accept)
 
     def stop(self):
         if self._client_socket:

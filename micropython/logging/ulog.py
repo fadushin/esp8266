@@ -25,6 +25,7 @@
 #
 
 import sys
+import time
 
 class Log :
     '''
@@ -100,7 +101,6 @@ class Log :
             sys.print_exception(e)
 
     def datetimestr(self) :
-        import time
         year, month, day, hour, minute, second, millis, _tzinfo = time.localtime()
         return "%d-%02d-%02dT%02d:%02d:%02d.%03d" % (year, month, day, hour, minute, second, millis)
             

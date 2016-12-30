@@ -88,7 +88,7 @@ class TestAPIHandler:
 
 server = None
 
-def start():
+def start(backlog=5):
     print("Starting test server ...")
     import uhttpd
     import http_file_handler
@@ -102,7 +102,8 @@ def start():
         ('/api', api_handler),
         ('/test', file_handler)
     ], {
-        'require_auth': True
+        'require_auth': True,
+        'backlog': backlog
     })
     server.start()
 
