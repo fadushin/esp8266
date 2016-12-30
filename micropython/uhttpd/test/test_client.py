@@ -257,7 +257,7 @@ class HttpdTest(unittest.TestCase):
         import time
         for i in range(10):
             self.verify_get('/test/foo/bar/test.js', expected_status=200, expected_content_type='text/javascript', expected_body=b'{\'foo\': "bar"}')
-            #time.sleep(1)
+            time.sleep(0.1)
 
 
 if __name__ == '__main__':

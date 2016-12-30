@@ -41,13 +41,13 @@ def write(filename, str):
 
 def init():
     print("Initializing...")
-    mkdir('/www')
-    write('/www/index.html', "<html><body>Hello World!</body></html>")
-    mkdir('/www/foo')
-    write('/www/foo/test.txt', "test")
-    mkdir('/www/foo/bar')
-    write('/www/foo/bar/test.js', "{'foo': \"bar\"}")
-    write('/www/foo/bar/test.css', "html")
+    mkdir('/test')
+    write('/test/index.html', "<html><body>Hello World!</body></html>")
+    mkdir('/test/foo')
+    write('/test/foo/test.txt', "test")
+    mkdir('/test/foo/bar')
+    write('/test/foo/bar/test.js', "{'foo': \"bar\"}")
+    write('/test/foo/bar/test.css', "html")
 
 
 class TestAPIHandler:
@@ -88,11 +88,11 @@ class TestAPIHandler:
 
 server = None
 
-def start(backlog=5):
+def start(backlog=5, background=True):
     print("Starting test server ...")
     import uhttpd
     import http_file_handler
-    file_handler = http_file_handler.Handler()
+    file_handler = http_file_handler.Handler(root_path='/test')
     import http_api_handler
     api_handler = http_api_handler.Handler(
         [(['test'], TestAPIHandler())]
@@ -105,7 +105,7 @@ def start(backlog=5):
         'require_auth': True,
         'backlog': backlog
     })
-    server.start()
+    server.start(background)
 
 
 def stop():
