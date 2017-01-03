@@ -26,7 +26,8 @@
 import unittest
 
 #host = "localhost"
-host = "192.168.1.174"
+#host = "192.168.1.174"
+host = "192.168.1.180"
 
 class Connection:
 
@@ -167,8 +168,8 @@ class HttpdTest(unittest.TestCase):
 
     def test_api_return(self):
         self.verify_get('/api/test/nothing', expected_status=200, expected_content_type=None, expected_body=None)
-        self.verify_get('/api/test/empty', expected_status=200, expected_content_type="text/plain", expected_body=b'')
-        self.verify_get('/api/test/something', expected_status=200, expected_content_type="text/plain", expected_body=b'something')
+        self.verify_get('/api/test/empty', expected_status=200, expected_content_type="application/binary", expected_body=b'')
+        self.verify_get('/api/test/something', expected_status=200, expected_content_type="application/binary", expected_body=b'something')
 
     def test_api_exception(self):
         self.verify_get('/api/test/bad_request_excetion', expected_status=400, expected_content_type="text/html")
