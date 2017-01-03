@@ -92,6 +92,7 @@ class Server:
             #
             heading = self.parse_heading(
                 self.readline(client_socket).decode('UTF-8'))
+            logger.debug("Parsed heading {}".format(heading))
             http_request.update(heading)
             #
             # find the handler for the specified path.  If we don't have
@@ -102,9 +103,9 @@ class Server:
             handler = None
             for prefix, h in self._handlers:
                 if path.startswith(prefix):
-                    #request['relative_path'] = path[len(prefix):]
                     http_request['prefix'] = prefix
                     handler = h
+                    logger.debug("Found handler for prefix {}".format(prefix))
                     break
             #
             # Parse out the headers
@@ -120,6 +121,7 @@ class Server:
                 num_headers += 1
                 if num_headers > self._config['max_headers']:
                     raise BadRequestException("Number of headers exceeds maximum allowable")
+            logger.debug("Parsed headers {}".format(headers))
             http_request['headers'] = headers
             #
             # If the headers have a content length, then read the body
@@ -127,11 +129,13 @@ class Server:
             content_length = 0
             if 'content-length' in headers:
                 content_length = int(headers['content-length'])
-            if content_length > self._config['max_content_length']:
-                raise BadRequestException("Content size exceeds maximum allowable")
-            if content_length > 0:
-                body = client_socket.read(content_length)
-                http_request['body'] = body
+                logger.debug("content_length: {}".format(content_length))
+                if content_length > self._config['max_content_length']:
+                    raise BadRequestException("Content size exceeds maximum allowable")
+                elif content_length > 0:
+                    body = client_socket.read(content_length)
+                    logger.debug("Read body: {}".format(body))
+                    http_request['body'] = body
             #
             # If there is no handler, then raise a NotFound exception
             #
@@ -149,11 +153,13 @@ class Server:
                     return self.unauthorized_error(client_socket)
                 else:
                     remote_addr = tcp_request['remote_addr']
-                    if not self.is_authorized(headers['authorization']):
+                    is_authorized, user = self.is_authorized(headers['authorization'])
+                    if not is_authorized:
                         logger.info("UNAUTHORIZED {}".format(remote_addr))
                         return self.unauthorized_error(client_socket)
                     else:
                         logger.info("AUTHORIZED {}".format(remote_addr))
+                        http_request['user'] = user
             #
             # get the response from the active handler and serialize it
             # to the socket
@@ -190,7 +196,7 @@ class Server:
             'realm': "esp8266",
             'user': "admin",
             'password': "uhttpD",
-            'max_headers': 10,
+            'max_headers': 25,
             'max_content_length': 1024,
             'backlog': 5
         }
@@ -222,8 +228,8 @@ class Server:
             if tmp[0].lower() == "basic":
                 str = ubinascii.a2b_base64(tmp[1].strip().encode()).decode()
                 ra = str.split(':')
-                return ra[0] == self._config['user'] and ra[1] == self._config[
-                    'password']
+                auth_result = ra[0] == self._config['user'] and ra[1] == self._config['password']
+                return auth_result, ra[0]
             else:
                 raise BadRequestException(
                     "Unsupported authorization method: {}".format(tmp[0]))
@@ -315,6 +321,7 @@ class Server:
 
     @staticmethod
     def error(client_socket, code, error_message, e, headers={}):
+        logger.debug("Error!  code: {} error_message: {} exception: {}".format(code, error_message, e))
         ef = lambda stream: Server.stream_error(stream, error_message, e)
         response = Server.generate_error_response(code, ef, headers)
         return Server.response(client_socket, response)
@@ -375,12 +382,13 @@ class TCPServer:
             if response and len(response) > 0:
                 client_socket.write(response)
             if done:
-                self.close(client_socket)
+                client_socket.close()
                 return False
             else:
                 self._client_socket = client_socket
                 return True
-        except:
+        except Exception as e:
+            sys.print_exception(e)
             client_socket.close()
             self._client_socket = None
             return False
@@ -388,6 +396,7 @@ class TCPServer:
     def handle_accept(self, server_socket):
         client_socket, remote_addr = server_socket.accept()
         client_socket.settimeout(self._timeout)
+        logger.debug("Accepted connection from {}".format(remote_addr))
         tcp_request = {
             'remote_addr': remote_addr
         }
