@@ -42,7 +42,11 @@ TOOL_MODULES=\
 TEST_MODULES=\
 	uhttpd/test/test_server.py
 
-MODULES=$(LOGGING_MODULES) $(UHTTPD_MODULES) $(TOOL_MODULES) $(TEST_MODULES)
+WEB_CONSOLE_MODULES=\
+	web-console/system_api.py \
+	web-console/network_api.py
+
+MODULES=$(LOGGING_MODULES) $(UHTTPD_MODULES) $(TOOL_MODULES) $(TEST_MODULES) $(WEB_CONSOLE_MODULES)
 OUTPUTS=$(patsubst %.py, build/mpy/%.mpy, $(MODULES))
 
 all: $(OUTPUTS)

@@ -1,30 +1,31 @@
-"""
-Copyright (c) dushin.net  All Rights Reserved
+##
+## Copyright (c) dushin.net  All Rights Reserved
+##
+## Redistribution and use in source and binary forms, with or without
+## modification, are permitted provided that the following conditions are met:
+##     * Redistributions of source code must retain the above copyright
+##       notice, this list of conditions and the following disclaimer.
+##     * Redistributions in binary form must reproduce the above copyright
+##       notice, this list of conditions and the following disclaimer in the
+##       documentation and/or other materials provided with the distribution.
+##     * Neither the name of dushin.net nor the
+##       names of its contributors may be used to endorse or promote products
+##       derived from this software without specific prior written permission.
+##
+## THIS SOFTWARE IS PROVIDED BY dushin.net ``AS IS'' AND ANY
+## EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+## WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+## DISCLAIMED. IN NO EVENT SHALL dushin.net BE LIABLE FOR ANY
+## DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+## (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+## LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+## ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+## (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+## SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of dushin.net nor the
-      names of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY dushin.net ``AS IS'' AND ANY
-EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL dushin.net BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-"""
 import uhttpd
 import network
+from ulog import logger
 
 
 class Handler:
@@ -36,21 +37,34 @@ class Handler:
     #
 
     def get(self, api_request):
-        return self.get_network_stats()
+        logger.info("get {}".format(api_request))
+        context = api_request['context']
+        return self.get_network_stats(context)
 
     def post(self, api_request):
-        return None
+        logger.info("post {}".format(api_request))
+        return self.save(api_request)
+
+    def put(self, api_request):
+        logger.info("put {}".format(api_request))
+        return self.save(api_request)
 
     #
-    # internal operations
+    # read operations
     #
 
-    def get_network_stats(self):
-        return {
+    def get_network_stats(self, context):
+        ret = {
             'phy_mode': self.get_phy_mode(),
             'sta': self.get_sta_stats(),
             'ap': self.get_ap_stats()
         }
+        for component in context:
+            if component in ret:
+                ret = ret[component]
+            else:
+                raise uhttpd.NotFoundException("Bad context: {}".format(context))
+        return ret
 
     def get_sta_stats(self):
         sta = network.WLAN(network.STA_IF)
@@ -128,3 +142,27 @@ class Handler:
             return 'MODE_11N'
         else:
             return "Unknown phy_mode: {}".format(phy_mode)
+
+    #
+    # save operations
+    #
+
+    def save(self, api_request):
+        context = api_request['context']
+        logger.info("context: {}".format(context))
+        if context == ['ap', 'config']:
+            return self.save_ap_config(api_request)
+        else:
+            raise uhttpd.BadRequestException("Unsupported context on save: {}", context)
+
+    def save_ap_config(self, api_request):
+        config = api_request['body']
+        ap = network.WLAN(network.AP_IF)
+        logger.info("config: {}".format(config))
+        ap.config(
+            #mac=config['mac'],
+            essid=config['essid'],
+            channel=config['channel'],
+            hidden=config['hidden']
+        )
+        return self.get_wlan_config_stats(ap)
