@@ -13,7 +13,7 @@ Features include:
 
 By itself, the `uhttpd` module is just a TCP server and framework for adding handlers to process HTTP requests.  The actual servicing of HTTP requests is done by installing HTTP Request handlers, which are passed to the `uhttpd` server at creation time.  It's the Request Handlers that actually do the heavy lifting when it comes to servicing HTTP requests.  Request Handlers are triggered based on the URLs that are used by the client.  Multiple Request Handlers can be installed, each of which can handle a special case based on a particular URL prefix.
 
-This package includes a Request Handler for servicing files on the micropython file system (e.g., HTML, Javascript, CSS, etc), as well as a Request Handler for managing REST-ful API calls, essential components in any modern web-based application.  The API Request Handler in turns supports the addition of application-specific API Handlers, described in more detail below.
+This package includes a Request Handler for servicing files on the micropython file system (e.g., HTML, Javascript, CSS, etc), as well as a Request Handler for managing REST-ful API calls, essential components in any modern web-based application.  The API Request Handler in turn supports the addition of application-specific API Handlers, described in more detail below.
 
 Once started, the `uhttpd` server runs in the background, so that the ESP8266 can do other tasks.  When the server accepts a request, however, the ESP8266 will block for the period of time it takes to process the request, i.e., read and parse the request sent from the client, dispatch the parsed request to the designated handler to get a response, and send the response back to the client.  Ordinarily, this should only take a few milliseconds, but applications may vary in their request processing time.
 
@@ -25,9 +25,9 @@ A driving design goal of this package is to have minimal impact on the ESP8266 d
 
 While the `uhttpd` code is intended to be a robust HTTP server for many needs, there are currently some limitations users should be aware of:
 
-* There are currently limitations to the number of concurrent requests made on the server.  Many web browsers will attempt to run multiple connections to a given host, and will attemt to load resources (images, scripts, stylesheets, etc) in parallel.  The current implementation is unable to service requests in parallel, and many of the connections the web browser makes will get dropped, resulting in delays or inability to load page content.  You *might* be able to work around these limitations by in-lining as many of your scripts and resources as possible.
+* There are currently limitations to the number of concurrent requests made on the server.  Many web browsers will attempt to run multiple connections to a given host, and will attemt to load resources (images, scripts, stylesheets, etc) in parallel.  The current implementation is unable to service requests in parallel, and many of the connections the web browser makes will get dropped, resulting in delays or inability to load page content.  You *might* be able to work around these limitations by in-lining as many of your scripts and resources as possible.  Work is ongoing to address this limitation.
 * This software currently does not support SSL, and therefore provides no transport-layer protection for your applications.  When this software is running, requests are sent in clear text, including not only the HTTP headers you may use for authentication, but also the contents of the HTTP requests and responses.  Malicious users on your network using off-the-shelf packet sniffers can read your HTTP traffic with no difficulty.  AS WRITTEN, THIS SOFTWARE IS NOT INTENDED FOR USE IN AN UNTRUSTED NETWORK!
-* The amount of workable RAM is very limited on the ESP8266, on the order of 32k.  Users should design applications with this in mind.
+* The amount of workable RAM is very limited on the ESP8266, on the order of 32kb.  Users should design applications with this in mind.
 
 ## Modules and Dependencies
 
@@ -150,7 +150,7 @@ If you try to make a request without supplying HTTP Basic authentiction credenti
     Content-Type: text/html
     www-authenticate: Basic realm=esp8266
     
-    <html><body><header>uhttpd/pre-0.1<hr></header>Unauthorized</body></html>
+    <html><body><header>uhttpd/master<hr></header>Unauthorized</body></html>
 
 If you use a web browser to access this page, you should get a popup window prompting you for a username and password.
 
@@ -168,7 +168,7 @@ When you supply the correct credentials (e.g., via `curl`), you should be grante
 
 This package includes a Request Handler, `http_file_handler.Handler` which when installed will service files on the ESP8266 file system, relative to a specified file system root path (e.g., `/www`).
 
-This Request Handler will display the contents of the path specified in the HTTP GET URL, relative to the specified root path.  If path refers to a file on the file system, the file contents are returned.  If the path refers to a directory, and the directory does not contain an `index.html` file, the directory contents are provided as a list of hyperlinks.  Otherwise, the request will result in a 404/Not Found HTTP error.
+This Request Handler will display the contents of the path specified in the HTTP GET URL, relative to the specified root path.  If path refers to a file on the file system, the file contents are returned.  If the path refers to a directory, and the directory does not contain an `index.html` file, the directory contents are provided as a list of hyperlinks.  Otherwise, the request will result in a 404/Not Found HTTP error.  If a request is made on a path outside of the specified root path, then request will fail with a 403 Forbidden error.
 
 The default root path for the `http_file_handler.Handler` is `/www`.  For example, the following constructor will result in a file handler that services files in and below the `/www` directory of the micropython file system:
 
@@ -188,7 +188,7 @@ You may of course specify a root path other than `/www` through the `http_file_h
 
 > Warning: If you specify the micropython file system root path (`/`) in the HTTP File Handler constructor, you may expose sensitive security information, such as the Webrepl password, through the HTTP interface.  This behavior is strongly discouraged.
 
-You may optionally specify the `block_size` as a parameter to the `http_file_handler.Handler` constructor.  This integer value (default: 1024) determines the size of the buffer to use when streaming a file back to the client.  Larger chunk sizes require more memory and may run into issues with memory.  Smaller chunk sizes may result in degradation in performance.
+You may optionally specify the `block_size` as a parameter to the `http_file_handler.Handler` constructor.  This integer value (default: 1024) determines the size of the buffer to use when streaming a file back to the client.  Larger chunk sizes require more memory and may run into issues with memory.  Smaller chunk sizes may result in degradation in performance.  If a memory error occurs when creating this buffer, the file handler will attempt to allocate buffer one half the size of the previous failed allocation, until either the allocation succeeds, or not even a single byte buffer is available.
 
 This handler only supports HTTP GET requests.  Any other HTTP request verb will be rejected.
 
@@ -251,7 +251,7 @@ You can then make HTTP requests to your handler via:
 
 The API handler method all take a single `api_request` parameter, which encapsulates the data present in the current request.  This parameter is a dictionary containing elements that have been parsed off the HTTP request and TCP/IP connection.  In many cases, applications do not need to deeply inspect the contents of this object, but portions of its structure are needed for handling common requests.
 
-The entries of an HTTP request structure include the following keys:
+The entries of an API request structure include the following keys:
 
 * `'prefix'` The prefix used to identify the API handler.  For example, if the API handler is registered with the `http_api_handler.Hander` using the prefix ['demo'], then the `'prefix'` value will be `['demo']`.
 * `'context'`  This entry contains a list of path components in the HTTP request after the prefix.  For example, if the API handler is registered with the `http_api_handler.Hander` using the prefix ['demo'], and the `http_api_handler.Handler` is registered with the `uhttpd.Server` class with the prefix `/api`, when the HTTP request is `/api/demo/foo/bar`, the `'context'` entry will contain the list `['foo', 'bar']`.
@@ -264,8 +264,9 @@ The `http` entry contains a dictionary of elements that have been parsed off the
 * `'verb'` The HTTP "verb" (e.g., "get", "put", "post", etc.)  The string value provided on the wire is converted to lower case.
 * `'path'`  The path, as it was specified in the HTTP request
 * `'protocol'` The HTTP protocol provided by the client (e.g., "HTTP/1.1")
-* `'prefix'`  This entry dentotes the prefix 
+* `'prefix'`  This entry dentotes the prefix with which the HTTP Request Handler was registered with the `uhttpd.Server`.
 * `'headers'` A dictionary containing the HTTP headers parsed from the HTTP request.  All keys in this dictionary are lower case.
+* `'user'` If HTTP authentication is required and the user has successfully authenticated, this entry contains the user name supplied via HTTP authentication headers.  Otherwise, this entry is not present in the `http` dictionary.
 * `'body'`  The body of the request, as a byte array.  If no body is present in the request, then this entry is not defined.
 * `'tcp'` A dictionary containing properties of the client TCP/IP connection.
 
@@ -275,7 +276,11 @@ The `tcp` entry contains the following elements:
 
 ### Return value
 
-The return value from these operations is a JSON structure (i.e., python Dictionary) that can be converted to a JSON string, a raw byte array, or `None`.  If the return value is None, no response is returned to client.  If the return value is a raw byte array, the value is returned in the body of the HTTP response with the content type `text/plain`.  Otherwise, the returned dictionary is transformed into a JSON string and is returned to the client.  The content type in the HTTP response is set to `application/json`.
+The return value from these operations may one of the following:
+
+* A JSON structure (i.e., python Dictionary) that can be converted to a JSON string:  In this case, the body of the HTTP response is the converted JSON string, and the content type is set to `application/json`.
+* A raw byte array:  In this case, the raw byte array is is returned in the body of the HTTP response, and the content type is set to `application/binary`.
+* `None`: In this case, the HTTP response contains no body.
 
 ### Exception Semantics
 
@@ -287,7 +292,7 @@ Raising the following exceptions will generate the corresponding error codes bac
 * `uhttpd.NotFoundException`: 404
 * `uhttpd.ForbiddenException`: 403
 
-Any other exception extending `BaseException` will generate an internal server errro (500)
+Any other exception extending `BaseException` will generate an internal server error (500)
 
 
 ## Reference
@@ -296,9 +301,9 @@ The following sections describe the components that form the `uhttpd` package in
 
 ### `uhttpd.Server`
 
-The `uhttpd.Server` is simply a container for HTTP Request Handlers.  Its only job is to accept connections from clients, to read and parse HTTP headers, and to read the body of the request, if present.  The server will the dispatch the request to the first handler that matches the path indicated in the HTTP request, and wait for a response.  Once received, the response will be sent back to the caller.
+The `uhttpd.Server` is a container for HTTP Request Handlers.  Its only job is to accept connections from clients, to read and parse HTTP headers, to enforce HTTP authentication, if so configured, and to read the body of the request, if present.  The server will the dispatch the request to the first handler that matches the path indicated in the HTTP request, and wait for a response.  Once received, the response will be sent back to the caller.
 
-An instance of a `uhttpd.Server` is created using an ordered list of pairs, where the first element of the pair is a path prefix, and the second is a handler index.  When an HTTP request is processed, the server will select the handler that corresponds with the first path prefix which is a prefix of the path in the HTTP request.
+An instance of a `uhttpd.Server` is created using an ordered list of pairs, where the first element of the pair is a path prefix, and the second is a handler instance.  When an HTTP request is processed, the server will select the handler that corresponds with the first path prefix which is a prefix of the path in the HTTP request.
 
 For example, given the following construction:
 
@@ -355,6 +360,13 @@ This parameter denotes the HTTP user name, which needs to be supplied by the use
 
 This parameter denotes the HTTP password, which needs to be supplied by the user in an HTTP Basic authentication header, per RFC 7231.  The default password is `uhttpD`.
 
+##### `max_headers`
+
+This parameter denotes the maximum number of headers an HTTP request may contain.  If a request exceeds this maximum, the request will fail with an HTTP 400 Bad Request error.  The default value is 25.
+
+##### `max_content_length`
+
+This parameter denotes the maximum size (in bytes) of the body of an HTTP request.  If a request exceeds this maximum, the request will fail with an HTTP 400 Bad Request error.  The default value is 1024.
 
 ### `http_file_handler.Handler`
 
@@ -363,7 +375,7 @@ The `http_file_handler.Handler` request handler is designed to service files on 
 This class supports the following properties at initialization:
 
 * `root_path`  (default: `"/www"`)  The root path from which to serve files.
-* `block_size`  (defualt: `1024`)  The size of the buffer used to stream files back to the client.  Use smaller buffer sizes to reduce the changes of memory allocation failures due to memory framentation.
+* `block_size`  (defualt: `1024`)  The size of the buffer used to stream files back to the client.  If a memory error occurs when creating this buffer, the file handler will attempt to allocate buffer one half the size of the previous failed allocation, until either the allocation succeeds, or not even a single byte buffer is available.
 
 > Warning.  You should set `root_path` to a directory that does not contain sensitive security information, such as usernames or passwords used to access the device or for the device to reach external services.
 
@@ -407,107 +419,4 @@ This way, any HTTP requests under `http://host/api` get directed to the HTTP API
 
 The HTTP API Handler, like the `uhttp.Server`, does not do much processing on the request, but instead uses the HTTP path to locate the first API Handler that matches the sequence of components provided in the constructor.  In the above example, a request to `http://host/api/foo/` would get processed by the `api1` handler (as would requests to `http://host/api/foo/bar`), whereas requests simply to `http://host/api/` would get procecced by the `api3` handler.
 
-For more information about API Handlers, see the _Writing API Handlers_ section, below.
-
-### `stats_api.Handler`
-
-This package includes one HTTP API Handler instance, which can be used to retrieve runtime statistics from the ESP8266 device.  This API is largely for demonstration purposes, but it can also be used as basis for building a Web UI to manage an ESP8266 device.
-
-Here is a complete example of construction of a server using this handler:
-
-    >>> import http_file_handler
-    >>> file_handler = http_file_handler.Handler()
-    >>> import stats_api
-    >>> stats = stats_api.Handler()
-    >>> import http_api_handler
-    >>> api_handler = http_api_handler.Handler([
-            (['stats'], stats)
-        ])
-    >>> import uhttpd
-    >>> server = uhttpd.Server([
-            ('/api', api_handler),
-            ('/', file_handler)
-        ])
-
-Here is some sample output from curl:
-
-    prompt$ curl -s 'http://192.168.1.180/api/stats' | python -m json.tool
-    {
-        "esp": {
-            "flash_id": 1327328,
-            "flash_size": 1048576,
-            "free_mem": 8288
-        },
-        "gc": {
-            "mem_alloc": 29952,
-            "mem_free": 6336
-        },
-        "machine": {
-            "freq": 80000000,
-            "unique_id": "0xBBB81500"
-        },
-        "network": {
-            "ap": {
-                "config": {
-                    "authmode": "AUTH_WPA_WPA2_PSK",
-                    "channel": 11,
-                    "essid": "MicroPython-80d271",
-                    "hidden": false,
-                    "mac": "0x5ecf7f15b8bb"
-                },
-                "ifconfig": {
-                    "dns": "192.168.1.1",
-                    "gateway": "192.168.4.1",
-                    "ip": "192.168.4.1",
-                    "subnet": "255.255.255.0"
-                },
-                "status": "Unknown wlan status: -1"
-            },
-            "phy_mode": "MODE_11N",
-            "sta": {
-                "ifconfig": {
-                    "dns": "192.168.1.1",
-                    "gateway": "192.168.1.1",
-                    "ip": "192.168.1.180",
-                    "subnet": "255.255.255.0"
-                },
-                "status": "STAT_GOT_IP"
-            }
-        },
-        "sys": {
-            "byteorder": "little",
-            "implementation": {
-                "name": "micropython",
-                "version": [
-                    1,
-                    8,
-                    6
-                ]
-            },
-            "maxsize": 2147483647,
-            "modules": [
-                "stats_api",
-                "flashbdev",
-                "console_sink",
-                "webrepl_cfg",
-                "uhttpd",
-                "webrepl",
-                "http_api_handler",
-                "ulog",
-                "websocket_helper"
-            ],
-            "path": [
-                "",
-                "/lib",
-                "/"
-            ],
-            "platform": "esp8266",
-            "version": "3.4.0",
-            "vfs": {
-                "bavail": 78,
-                "blocks": 101,
-                "frsize": 4096
-            }
-        }
-    }
-
+For more information about API Handlers, see the _Writing API Handlers_ section.
