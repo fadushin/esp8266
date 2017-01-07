@@ -31,72 +31,168 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	<head>
 		<title>ESP8266 Web Console</title>
 		<style>
-			body {
-				background-color: rgb(192, 192, 192);
-				font: 15px veranda, sans-serif;
+			#loader {
+				position: absolute;
+				left: 50%;
+				top: 50%;
+				z-index: 1;
+				width: 100px;
+				height: 100px;
+				margin: -75px 0 0 -75px;
+				border: 16px solid #f3f3f3;
+				border-radius: 50%;
+				border-top: 16px solid #3498db;
+				width: 120px;
+				height: 120px;
+				-webkit-animation: spin 2s ease infinite;
+				animation: spin 2s ease infinite;
 			}
-			div.network {
-				border-style: groove;
-				padding: 10px;
+			@-webkit-keyframes spin {
+				0% { -webkit-transform: rotate(0deg); }
+				100% { -webkit-transform: rotate(360deg); }
 			}
-			div.wlan {
-				padding: 10px;
+			@keyframes spin {
+				0% { transform: rotate(0deg); }
+				100% { transform: rotate(360deg); }
 			}
-			div.wlan_config {
-				padding: 10px;
+			.animate-bottom {
+				position: relative;
+				-webkit-animation-name: animatebottom;
+				-webkit-animation-duration: 1s;
+				animation-name: animatebottom;
+				animation-duration: 1s
 			}
-			table, td, th {
-				border: 1px solid #ddd;
-				text-align: left;
+			@-webkit-keyframes animatebottom {
+				from { bottom:-100px; opacity:0 } 
+				to { bottom:0px; opacity:1 }
 			}
-			table {
-				border-collapse: collapse;
-				width: 100%;
+			@keyframes animatebottom { 
+				from{ bottom:-100px; opacity:0 } 
+				to{ bottom:0; opacity:1 }
 			}
-			th, td {
-				padding: 10px;
+			#content {
+				display: none;
 			}
 		</style>
 	</head>
-	<body>
-		
-		<div id="system" class="network">
-			System
-			<div id="system-view" class="wlan">
-				<script type="text/template" id="system-tmpl">
-					Status
-					<table>
-						<tr><td>platform</td><td><%= platform %></td></tr>
-						<tr><td>version</td><td><%= version %></td></tr>
-						<tr><td>system</td><td><%= system %></td></tr>
-						<tr><td>machine_id</td><td><%= machine_id %></td></tr>
-						<tr><td>machine_freq</td><td><%= machine_freq %></td></tr>
-					</table>
-				</script>
+	<body onload="timedShowContents()">
+		<div id="loader"></div>
+		<div id="content" class="w3-panel animate-bottom" style="display:none;">
+			<div id="tabs" class="w3-container" style="min-height:600px">
+				<ul class="w3-navbar w3-blue-gray">
+					<li><a class="tablink w3-text-light-grey w3-black" href="javascript:void(0)" onclick="openPanel(event, 'about')">About</a></li>
+					<li><a class="tablink w3-text-light-grey" href="javascript:void(0)" onclick="openPanel(event, 'system')">System</a></li>
+					<li><a class="tablink w3-text-light-grey" href="javascript:void(0)" onclick="openPanel(event, 'memory')">Memory</a></li>
+					<li><a class="tablink w3-text-light-grey" href="javascript:void(0)" onclick="openPanel(event, 'flash')">Flash</a></li>
+					<li><a class="tablink w3-text-light-grey" href="javascript:void(0)" onclick="openPanel(event, 'network')">Network</a></li>
+				</ul>
+				<div id="about" class="w3-panel w3-animate-opacity wc-panel">
+					<div id="about-view">
+						A web console into your ESP8266
+					</div>
+				</div>
+				<div id="system" class="w3-panel w3-animate-opacity wc-panel" style="display:none">
+					<div id="system-view" class="wlan">
+						<script type="text/template" id="system-tmpl">
+							<table class="w3-table-all w3-card-4">
+								<tr><td>platform</td><td><%= platform %></td></tr>
+								<tr><td>system</td><td><%= system %></td></tr>
+								<tr><td>machine_id</td><td><%= machine_id %></td></tr>
+								<tr><td>machine_freq</td><td><%= machine_freq %></td></tr>
+							</table>
+						</script>
+					</div>
+				</div>
+				<div id="memory" class="w3-panel w3-animate-opacity wc-panel" style="display:none">
+					<div id="memory-view" class="wlan">
+						<script type="text/template" id="memory-tmpl">
+							<table class="w3-table-all w3-card-4">
+								<tr><td>capacity</td><td><%= capacity %></td></tr>
+								<tr><td>mem_alloc</td><td><%= mem_alloc %></td></tr>
+								<tr><td>mem_free</td><td><%= mem_free %></td></tr>
+								<tr><td>usage</td><td>
+									<div class="w3-progress-container w3-green">
+										<div class="w3-progressbar w3-red" style="width:<%= usage %>%">
+											<div class="w3-center w3-text-white"><%= usage %>%</div>
+										</div>
+									</div>	
+								</td></tr>
+							</table>
+						</script>
+					</div>
+				</div>
+				<div id="flash" class="w3-panel w3-animate-opacity wc-panel" style="display:none">
+					<div id="flash-view" class="wlan">
+						<script type="text/template" id="flash-tmpl">
+							<table class="w3-table-all w3-card-4">
+								<tr><td>flash_id</td><td><%= flash_id %></td></tr>
+								<tr><td>flash_size</td><td><%= flash_size %></td></tr>
+								<tr><td>capacity</td><td><%= capacity %></td></tr>
+								<tr><td>used</td><td><%= used %></td></tr>
+								<tr><td>free</td><td><%= free %></td></tr>
+								<tr><td>usage</td><td>
+									<div class="w3-progress-container w3-green">
+										<div class="w3-progressbar w3-red" style="width:<%= usage %>%">
+											<div class="w3-center w3-text-white"><%= usage %>%</div>
+										</div>
+									</div>	
+								</td></td></tr>
+							</table>
+						</script>
+					</div>
+				</div>
+				<div id="network" class="w3-panel w3-animate-opacity wc-panel" style="display:none">
+					<div id="ap-view" class="wlan">
+						Access Point
+						<div id="ap-config-view" class="wlan_config">
+							<script type="text/template" id="ap-config-tmpl">
+								<table class="w3-table-all w3-card-4">
+									<tr><td>authmode</td><td><%= authmode %></td></tr>
+									<tr><td>hidden</td><td><%= hidden %></td></tr>
+									<tr><td>mac</td><td><%= mac %></td></tr>
+									<tr><td>channel</td><td><%= channel %></td></tr>
+									<tr><td>essid</td><td><input type="text" name="essid" class="essid" value=<%= essid %> ></td></tr>
+								</table>
+								<div class="w3-panel w3-clear">
+									<button class="save w3-btn w3-right">Save</button>
+								</div>
+							</script>
+						</div>
+					</div>
+				</div>
 			</div>
-		</div>
-		
-		<div id="network" class="network">
-			Network
-			<div id="ap-view" class="wlan">
-				Access Point
-				<div id="ap-config-view" class="wlan_config">
-					<script type="text/template" id="ap-config-tmpl">
-						Config
-						<table>
-							<tr><td>authmode</td><td><%= authmode %></td></tr>
-							<tr><td>hidden</td><td><%= hidden %></td></tr>
-							<tr><td>mac</td><td><%= mac %></td></tr>
-							<tr><td>channel</td><td><%= channel %></td></tr>
-							<tr><td>essid</td><td><input type="text" name="essid" class="essid" value=<%= essid %> ></td></tr>
-						</table>
-						<button class="save">Save</button>
-					</script>
+			<div id="footer" class="w3-row w3-teal">
+				<div class="w3-container w3-threequarter">
+					ESP8266 Web Console 
+				</div>
+				<div class="w3-container w3-quarter">
+					<strong>version:</strong> <em>master</em>
 				</div>
 			</div>
 		</div>
 		
-
+		<script>
+			function openPanel(evt, panelName) {
+				var i;
+				var x = document.getElementsByClassName("wc-panel");
+				for (i = 0; i < x.length; i++) {
+					x[i].style.display = "none";  
+				}
+				tablinks = document.getElementsByClassName("tablink");
+					for (i = 0; i < x.length; i++) {
+						tablinks[i].className = tablinks[i].className.replace(" w3-black", "");
+				}
+				document.getElementById(panelName).style.display = "block";
+				evt.currentTarget.className += " w3-black";
+			}
+			function timedShowContents() {
+				setTimeout(showContents, 1000);
+			}
+			function showContents() {
+				document.getElementById("loader").style.display = "none";
+				document.getElementById("content").style.display = "block";
+			}
+		</script>
 		<!-- <script src="js/lib/jquery-3.1.1-min.js"></script> -->
 		<script src="https://code.jquery.com/jquery-3.1.1.js"></script>
 		<!-- <script src="js/lib/underscore-1.8.3-min.js"></script> -->
@@ -104,7 +200,5 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		<!-- <script src="js/lib/backbone-1.3.3-min.js"></script> -->
 		<script src="http://backbonejs.org/backbone.js"></script>
 		<script src="js/app.js"></script>
-		
-
 	</body>
 </html>
