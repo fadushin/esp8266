@@ -154,8 +154,48 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 									<tr><td>essid</td><td><input type="text" name="essid" class="essid" value=<%= essid %> ></td></tr>
 								</table>
 								<div class="w3-panel w3-clear">
-									<button class="save w3-btn w3-right">Save</button>
+									<button onclick="openApConfigModal()" class="w3-btn w3-right">Modify...</button>
 								</div>
+							</script>
+						</div>
+					</div>
+					<div id="ap-config-modal" class="w3-modal w3-animate-opacity">
+						<div id="ap-config-modal-content" class="w3-modal-content w3-card-8">
+							<script type="text/template" id="ap-config-modal-tmpl">
+							<header class="w3-container w3-blue-gray"> 
+								<span onclick="closeApConfigModal()" class="w3-closebtn">&times;</span>
+								<h2>ESP8266 Access Point Configuration</h2>
+							</header>
+							<div class="w3-container">
+									<p><input id="ap-config-active" class="w3-check" type="checkbox" checked="checked" name="active"><label class="w3-validate">Active</label></p>
+									<p><input id="ap-config-hidden" class="w3-check" type="checkbox" value="<%= hidden %>" ><label class="w3-validate" name="hidden">Hidden</label></p>
+									<p>Authentication Mode:
+										<select id="ap-config-authmode" class="w3-select w3-border" name="authmode">
+										<option value="<%= authmode %>" disabled selected><%= authmode %></option>
+										<option value="AUTH_OPEN">Open (no authentication)</option>
+										<option value="AUTH_WEP">WEP</option>
+										<option value="AUTH_WPA_PSK">WPA_PSK</option>
+										<option value="AUTH_WPA2_PSK">WPA2_PSK</option>
+										<option value="AUTH_WPA_WPA2_PSK">WPA_WPA2_PSK</option>
+									</select></p>
+									<p>ESSID: <input id="ap-config-essid" class="essid w3-input w3-border w3-round" type="text" name="essid" value="<%= essid %>"></p>
+									<p>Password: <input id="ap-config-password" class="w3-input w3-border w3-round" type="password" name="password"></p>
+									<p>Retype Password: <input id="ap-config-retype-password" class="w3-input w3-border w3-round" type="password"></p>
+							</div>
+							<footer class="w3-container w3-blue-gray">
+								<div class="w3-row w3-padding-4">
+									<div class="w3-container w3-right">
+										<div class="w3-row">
+											<div class="w3-container w3-half">
+												<button onclick="closeApConfigModal()" class="w3-btn w3-light-gray">Cancel</button>
+											</div>
+											<div class="w3-container w3-half">
+												<button id="ap-config-save" onclick="saveApConfig()" class="save w3-btn">Save</button>
+											</div>
+										</div>
+									</div>
+								</div>
+							</footer>
 							</script>
 						</div>
 					</div>
@@ -191,6 +231,31 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 			function showContents() {
 				document.getElementById("loader").style.display = "none";
 				document.getElementById("content").style.display = "block";
+			}
+			function openApConfigModal(){
+				/*
+				var activeCheckbox = document.getElementById('ap-config-active');
+				activeCheckbox.checked = true; //ap_config_model.get('')
+				var hiddenCheckbox = document.getElementById('ap-config-hidden');
+				hiddenCheckbox.checked = ap_config_model.get('hidden')
+				var authModeSelection = document.getElementById('ap-config-authmode');
+				authModeSelection.value = ap_config_model.get('authmode')
+				var essidTextField = document.getElementById('ap-config-essid');
+				essidTextField.value = ap_config_model.get('essid')
+				var passwordField = document.getElementById('ap-config-password');
+				passwordField.value = ""
+				var retypePasswordField = document.getElementById('ap-config-retype-password');
+				retypePasswordField.value = ""
+				*/
+				ap_config_modal_view.model = ap_config_model.clone();
+				ap_config_modal_view.render();
+				document.getElementById('ap-config-modal').style.display='block';
+			}
+			function closeApConfigModal(){
+				document.getElementById('ap-config-modal').style.display='none'
+			}
+			function saveApConfig(){
+				this.closeApConfigModal()
 			}
 		</script>
 		<!-- <script src="js/lib/jquery-3.1.1-min.js"></script> -->

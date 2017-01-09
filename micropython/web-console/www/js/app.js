@@ -207,9 +207,43 @@ var APConfigView = Backbone.View.extend({
 	}
 });
 
-var ap_config = new APConfigModel();
+var ap_config_model = new APConfigModel();
 
 // var ap_config_view = new APConfigView({model: ap_config})
 var ap_config_view = null;
-setTimeout(function(){ap_config_view = new APConfigView({model: ap_config});}, 500);
+setTimeout(function(){ap_config_view = new APConfigView({model: ap_config_model});}, 500);
+
+
+
+
+var ModalAPConfigView = Backbone.View.extend({
+	el: '#ap-config-modal-content',
+	template: _.template($('#ap-config-modal-tmpl').html()),
+	
+	events: {
+		'change .essid': 'onChangeEssid',
+		'click .save': 'onSave'
+	},
+	
+	initialize: function() {
+		this.listenTo(this.model, 'sync change', this.render);
+		this.model = ap_config_model.clone();
+		this.render();
+	},
+
+	onChangeEssid: function(evt) {
+		this.model.set('essid', evt.currentTarget.value);
+	},
+
+	onSave: function(evt) {
+		this.model.save();
+	},
+
+	render: function() {
+		var html = this.template(this.model.toJSON());
+		this.$el.html(html);
+		return this;
+	}
+});
+var ap_config_modal_view = new ModalAPConfigView({model: new APConfigModel()});
 
