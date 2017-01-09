@@ -151,7 +151,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 									<tr><td>hidden</td><td><%= hidden %></td></tr>
 									<tr><td>mac</td><td><%= mac %></td></tr>
 									<tr><td>channel</td><td><%= channel %></td></tr>
-									<tr><td>essid</td><td><input type="text" name="essid" class="essid" value=<%= essid %> ></td></tr>
+									<tr><td>essid</td><td><%= essid %></td></tr>
 								</table>
 								<div class="w3-panel w3-clear">
 									<button onclick="openApConfigModal()" class="w3-btn w3-right">Modify...</button>
@@ -168,9 +168,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 							</header>
 							<div class="w3-container">
 									<p><input id="ap-config-active" class="w3-check" type="checkbox" checked="checked" name="active"><label class="w3-validate">Active</label></p>
-									<p><input id="ap-config-hidden" class="w3-check" type="checkbox" value="<%= hidden %>" ><label class="w3-validate" name="hidden">Hidden</label></p>
+									<p><input id="ap-config-hidden" class="hidden w3-check" type="checkbox" value="<%= hidden %>" ><label class="w3-validate" name="hidden">Hidden</label></p>
 									<p>Authentication Mode:
-										<select id="ap-config-authmode" class="w3-select w3-border" name="authmode">
+										<select id="ap-config-authmode" class="authmode w3-select w3-border" name="authmode">
 										<option value="<%= authmode %>" disabled selected><%= authmode %></option>
 										<option value="AUTH_OPEN">Open (no authentication)</option>
 										<option value="AUTH_WEP">WEP</option>

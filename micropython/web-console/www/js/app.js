@@ -181,25 +181,12 @@ var APConfigView = Backbone.View.extend({
 	el: '#ap-config-view',
 	template: _.template($('#ap-config-tmpl').html()),
 	
-	events: {
-		'change .essid': 'onChangeEssid',
-		'click .save': 'onSave'
-	},
-	
 	initialize: function() {
 		this.listenTo(this.model, 'sync change', this.render);
 		this.model.fetch();
 		this.render();
 	},
-
-	onChangeEssid: function(evt) {
-		this.model.set('essid', evt.currentTarget.value);
-	},
-
-	onSave: function(evt) {
-		this.model.save();
-	},
-
+	
 	render: function() {
 		var html = this.template(this.model.toJSON());
 		this.$el.html(html);
@@ -221,6 +208,8 @@ var ModalAPConfigView = Backbone.View.extend({
 	template: _.template($('#ap-config-modal-tmpl').html()),
 	
 	events: {
+		'change .hidden': 'onChangeHidden',
+		'change .authmode': 'onChangeAuthMode',
 		'change .essid': 'onChangeEssid',
 		'click .save': 'onSave'
 	},
@@ -229,6 +218,14 @@ var ModalAPConfigView = Backbone.View.extend({
 		this.listenTo(this.model, 'sync change', this.render);
 		this.model = ap_config_model.clone();
 		this.render();
+	},
+
+	onChangeHidden: function(evt) {
+		this.model.set('hidden', evt.currentTarget.value);
+	},
+
+	onChangeAuthMode: function(evt) {
+		this.model.set('authmode', evt.currentTarget.value);
 	},
 
 	onChangeEssid: function(evt) {
