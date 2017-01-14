@@ -23,6 +23,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
+import time
 import socket
 import sys
 from ulog import logger
@@ -60,28 +61,50 @@ class Server:
             handler=self,
             backlog=self._config['backlog']
         )
+        self.reset_reqbuf()
 
     #
     # API
     #
 
     def run(self):
-        logger.info("uhttpd-{} running...".format(VERSION))
-        self.start(False)
-
-    def start(self, background=True):
-        self._tcp_server.start(background)
-        logger.info("uhttpd-{} started.".format(VERSION))
-
-    def stop(self):
-        self._tcp_server.stop()
-        logger.info("uhttpd-{} stopped.".format(VERSION))
+        logger.info("uhttpd-{} starting...".format(VERSION))
+        try:
+            self._tcp_server.run()
+        finally:
+            logger.info("uhttpd-{} stopped.".format(VERSION))
 
     #
     # Callbacks
     #
 
+    def reset_reqbuf(self):
+        self._reqbuf = [b'']
+        self._reqlen = 0
+
     def handle_request(self, client_socket, tcp_request):
+        rlen = self._config['max_header_length'] - self._reqlen
+        if rlen <= 0:
+            raise Exception("Maximum header length exceeded")
+        recv = client_socket.recv(self._config['max_header_length'] - self._reqlen)
+        self._reqlen += len(recv)
+        recv = self._reqbuf.pop() + recv
+        while b'\r\n' in recv:
+            line, recv = recv.split(b'\r\n',1)
+            self._reqbuf.append(line)
+            if not line:
+                self._reqbuf.append(recv)
+                self._reqbuf.reverse()
+                try:
+                    return self.process_request(self._reqbuf, client_socket, tcp_request)
+                finally:
+                    self.reset_reqbuf();
+            elif len(self._reqbuf) > self._config['max_headers']:
+                raise Exception("Maximum header count exceeded")
+        self._reqbuf.append(recv)
+        return (True, None)
+
+    def process_request(self, reqbuf, client_socket, tcp_request):
         http_request = {
             'tcp': tcp_request
         }
@@ -91,7 +114,7 @@ class Server:
             # parse out the heading line, to get the verb, path, and protocol
             #
             heading = self.parse_heading(
-                self.readline(client_socket).decode('UTF-8'))
+                self.readline(reqbuf).decode('UTF-8'))
             logger.debug("Parsed heading {}".format(heading))
             http_request.update(heading)
             #
@@ -111,17 +134,13 @@ class Server:
             # Parse out the headers
             #
             headers = {}
-            num_headers = 0
             while True:
-                line = self.readline(client_socket)
+                line = self.readline(reqbuf)
                 if not line or line == b'\r\n':
                     break
                 k, v = Server.parse_header(line.decode('UTF-8'))
                 headers[k.lower()] = v
-                num_headers += 1
-                if num_headers > self._config['max_headers']:
-                    raise BadRequestException("Number of headers exceeds maximum allowable")
-            logger.debug("Parsed headers {}".format(headers))
+            #logger.debug("Parsed headers {}".format(headers))
             http_request['headers'] = headers
             #
             # If the headers have a content length, then read the body
@@ -133,9 +152,13 @@ class Server:
                 if content_length > self._config['max_content_length']:
                     raise BadRequestException("Content size exceeds maximum allowable")
                 elif content_length > 0:
-                    body = client_socket.read(content_length)
+                    body = self.readline(reqbuf)
+                    if len(body) < content_length:
+                        body += client_socket.read(content_length-len(body))
+                    elif len(body) > content_length:
+                        reqbuf.append(body[content_length:])
+                        body = body[:content_length]
                     logger.debug("Read body: {}".format(body))
-                    http_request['body'] = body
             #
             # If there is no handler, then raise a NotFound exception
             #
@@ -165,15 +188,15 @@ class Server:
             # to the socket
             #
             response = handler.handle_request(http_request)
-            return Server.response(client_socket, response)
+            return Server.response(response)
         except BadRequestException as e:
-            return Server.bad_request_error(client_socket, e)
+            return Server.bad_request_error(e)
         except ForbiddenException as e:
-            return Server.forbidden_error(client_socket, e)
+            return Server.forbidden_error(e)
         except NotFoundException as e:
-            return Server.not_found_error(client_socket, e)
+            return Server.not_found_error(e)
         except BaseException as e:
-            return Server.internal_server_error(client_socket, e)
+            return Server.internal_server_error(e)
         finally:
             gc.collect()
 
@@ -198,11 +221,12 @@ class Server:
             'password': "uhttpD",
             'max_headers': 25,
             'max_content_length': 1024,
+            'max_header_length': 1024,
             'backlog': 5
         }
 
-    def readline(self, client_socket):
-        return client_socket.readline()
+    def readline(self, reqbuf):
+        return reqbuf.pop()
 
     @staticmethod
     def parse_heading(line):
@@ -242,7 +266,7 @@ class Server:
 
     @staticmethod
     def format_heading(code):
-        return "HTTP/1.1 {} {}".format(code, Server.lookup_code(code))
+        return "HTTP/1.0 {} {}".format(code, Server.lookup_code(code))
 
     @staticmethod
     def lookup_code(code):
@@ -269,28 +293,24 @@ class Server:
         return ret
 
     @staticmethod
-    def response(client_socket, response):
-        Server.serialize(client_socket, response)
-        return (True, None)
+    def response(response):
+        return (False, Server.serialize(response))
 
     @staticmethod
-    def serialize(stream, response):
+    def serialize(response):
         #
         # write the heading and headers
         #
-        stream.write("{}\r\n{}\r\n".format(
+        headers = "{}\r\n{}\r\n".format(
             Server.format_heading(response['code']),
             Server.format_headers(Server.update(
                 response['headers'], {'Server': Server.server_name()}
             ))
-        ).encode('UTF-8'))
+        ).encode('UTF-8')
         #
         # Write the body, if it's present
         #
-        if 'body' in response:
-            body = response['body']
-            if body:
-                body(stream)
+        return (headers, response.get('body'))
 
     def unauthorized_error(self, client_socket):
         headers = {
@@ -299,32 +319,32 @@ class Server:
         return Server.error(client_socket, 401, "Unauthorized", None, headers)
 
     @staticmethod
-    def bad_request_error(client_socket, e):
+    def bad_request_error(e):
         error_message = "Bad Request {}:".format(e)
-        return Server.error(client_socket, 400, error_message, e)
+        return Server.error(400, error_message, e)
 
     @staticmethod
-    def forbidden_error(client_socket, e):
+    def forbidden_error(e):
         error_message = "Forbidden {}:".format(e)
-        return Server.error(client_socket, 403, error_message, e)
+        return Server.error(403, error_message, e)
 
     @staticmethod
-    def not_found_error(client_socket, e):
+    def not_found_error(e):
         error_message = "Not Found: {}".format(e)
-        return Server.error(client_socket, 404, error_message, e)
+        return Server.error(404, error_message, e)
 
     @staticmethod
-    def internal_server_error(client_socket, e):
+    def internal_server_error(e):
         sys.print_exception(e)
         error_message = "Internal Server Error: {}".format(e)
-        return Server.error(client_socket, 500, error_message, e)
+        return Server.error(500, error_message, e)
 
     @staticmethod
-    def error(client_socket, code, error_message, e, headers={}):
+    def error(code, error_message, e, headers={}):
         logger.debug("Error!  code: {} error_message: {} exception: {}".format(code, error_message, e))
         ef = lambda stream: Server.stream_error(stream, error_message, e)
         response = Server.generate_error_response(code, ef, headers)
-        return Server.response(client_socket, response)
+        return Server.response(response)
 
     @staticmethod
     def stream_error(stream, error_message, e):
@@ -362,8 +382,7 @@ class Server:
         ef(stream)
         stream.write(data2)
 
-
-SO_REGISTER_HANDLER = const(20)
+import uselect
 
 class TCPServer:
     def __init__(self, port, handler, bind_addr='0.0.0.0',
@@ -373,53 +392,92 @@ class TCPServer:
         self._bind_addr = bind_addr
         self._timeout = timeout
         self._backlog = backlog
+        self._poller = uselect.poll()
+        self.initialize()
+
+    def initialize(self):
         self._server_socket = None
         self._client_socket = None
+        self._client_map = {}
+        gc.collect()
 
-    def handle_receive(self, client_socket, tcp_request):
+    def handle_client(self):
         try:
-            done, response = self._handler.handle_request(client_socket, tcp_request)
-            if response and len(response) > 0:
-                client_socket.write(response)
-            if done:
-                client_socket.close()
-                return False
-            else:
-                self._client_socket = client_socket
-                return True
+            state, response = self._handler.handle_request(self._client_socket, { 'remote_addr': self._client_addr })
+            gc.collect()
+            if response is not None:
+                self._client_socket.write(response[0])
+                if response[1] is not None:
+                    response[1](self._client_socket)
+            return state
         except Exception as e:
             sys.print_exception(e)
-            client_socket.close()
-            self._client_socket = None
-            return False
+        finally:
+            gc.collect()
 
-    def handle_accept(self, server_socket):
-        client_socket, remote_addr = server_socket.accept()
+    def handle_accept(self, client):
+        client_socket, client_addr = client
+        logger.info("+ {}".format(client_addr))
         client_socket.settimeout(self._timeout)
-        logger.debug("Accepted connection from {}".format(remote_addr))
-        tcp_request = {
-            'remote_addr': remote_addr
-        }
-        while self.handle_receive(client_socket, tcp_request):
-            pass
+        self._poller.register(client_socket, uselect.POLLIN)
+        self._client_map[client_addr] = (client_socket,time.time())
 
-    def start(self, background):
-        #
-        # Start the listening socket.  Handle accepts asynchronously
-        # in handle_accept/1
-        #
-        self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._server_socket.bind((self._bind_addr, self._port))
-        self._server_socket.listen(self._backlog)
-        if background:
-            self._server_socket.setsockopt(socket.SOL_SOCKET, SO_REGISTER_HANDLER, self.handle_accept)
-        else:
+    def handle_close(self, client_socket, client_addr=None):
+        if client_addr is None:
+            for key in self._client_map:
+                if self._client_map[key][0] == client_socket:
+                    client_addr = key
+                    break
+        logger.info("- {}".format(client_addr))
+        del self._client_map[client_addr]
+        self._poller.unregister(client_socket)
+        client_socket.close()
+
+    def run(self):
+        try:
+            self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self._server_socket.bind((self._bind_addr, self._port))
+            self._server_socket.listen(self._backlog)
+            self._poller.register(self._server_socket, uselect.POLLIN)
             while True:
-                self.handle_accept(self._server_socket)
+                ready = self._poller.poll(1000)
+                for entry in ready:
+                    if entry[0] == self._server_socket:
+                        self.handle_accept(self._server_socket.accept())
+                    else:
+                        if self._client_socket is None:
+                            self._client_socket = entry[0]
+                            for key in self._client_map:
+                                if self._client_map[key][0] == entry[0]:
+                                    self._client_addr = key
+                                    break
+                        elif entry[0] != self._client_socket:
+                            # Sorry we are serving another guy, please hold on...
+                            continue
+                        if not self.handle_client():
+                            self.handle_close(self._client_socket)
+                            self._handler.reset_reqbuf()
+                            self._client_socket = None
+                            gc.collect()
+                        break
 
-    def stop(self):
-        if self._client_socket:
-            self._client_socket.close()
-        if self._server_socket:
-            self._server_socket.close()
+                if len(ready) == 0:
+                    now = time.time()
+                    for client_addr, client_info in self._client_map.items():
+                        if now - client_info[1] > self._timeout:
+                            self.handle_close(client_info[0], client_addr)
+                            if client_info[0] == client_info[0]:
+                                self._handler.reset_reqbuf()
+                                self._client_socket = None
+                    gc.collect()
+        finally:
+            for client_addr, client_info in self._client_map.items():
+                logger.info("* {}".format(client_addr))
+                self._poller.unregister(client_info[0])
+                client_info[0].close()
+            if self._server_socket:
+                self._poller.unregister(self._server_socket)
+                self._server_socket.close()
+            # free up resources
+            self.initialize()
