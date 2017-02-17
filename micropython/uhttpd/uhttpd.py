@@ -440,6 +440,7 @@ class TCPServer:
             self._server_socket.bind((self._bind_addr, self._port))
             self._server_socket.listen(self._backlog)
             self._poller.register(self._server_socket, uselect.POLLIN)
+            logger.debug("Listening on {}:{} with backlog {}".format(self._bind_addr, self._port, self._backlog))
             while True:
                 ready = self._poller.poll(1000)
                 for entry in ready:
