@@ -79,3 +79,9 @@ On the ESP8266 you should see something like the following printed to the consol
     2000-01-01T00:09:47.005 [info] esp8266: ACCESS ('192.168.1.154', 59310) /www/foo/test.txt
     2000-01-01T00:09:47.005 [info] esp8266: AUTHORIZED ('192.168.1.154', 59311)
     2000-01-01T00:09:47.005 [info] esp8266: ACCESS ('192.168.1.154', 59311) /www/foo/bar
+
+
+To run a single test, edit the `host` variable in the `test_client.py` module to suite your ESP8266, and run, for example,
+
+    python3 -m unittest test_client.HttpdTest.test_concurrent_file
+

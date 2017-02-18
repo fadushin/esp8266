@@ -120,8 +120,8 @@ class Handler:
 
     def generate_file(self, path):
         f = open(path, 'r')
-        serializer = lambda stream: self.stream_file(stream, f)
-        return self.file_size(path), serializer
+        body = lambda stream: self.stream_file(stream, f)
+        return self.file_size(path), body
 
     def create_buffer(self):
         size = self._block_size
@@ -139,7 +139,7 @@ class Handler:
         while True:
             n = f.readinto(buf)
             if n:
-                stream.write(buf[:n])
+                yield from stream.awrite(buf[:n])
             else:
                 break
 
@@ -163,7 +163,7 @@ class Handler:
     def create_message_response(code, message):
         data = "<html><body>{}</body></html>".format(message).encode('UTF-8')
         length = len(data)
-        body = lambda stream: stream.write(data)
+        body = lambda stream: (yield from stream.awrite(data))
         return Handler.create_response(code, "text/html", length, body)
 
     def create_dir_listing_response(self, absolute_path):
@@ -186,7 +186,7 @@ class Handler:
             data += "<li><a href=\"{}\">{}</a></li>\n".format(self.to_path(tmp), f)
         data += "</ul></body></html>"
         data = data.encode('UTF-8')
-        body = lambda stream: stream.write(data)
+        body = lambda stream: stream.awrite(data)
         return len(data), body
 
     def to_path(self, components):

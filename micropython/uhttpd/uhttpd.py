@@ -23,10 +23,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-import socket
 import sys
 from ulog import logger
 import gc
+import uasyncio as asyncio
 
 VERSION = "master"
 
@@ -67,21 +67,13 @@ class Server:
 
     def run(self):
         logger.info("uhttpd-{} running...".format(VERSION))
-        self.start(False)
-
-    def start(self, background=True):
-        self._tcp_server.start(background)
-        logger.info("uhttpd-{} started.".format(VERSION))
-
-    def stop(self):
-        self._tcp_server.stop()
-        logger.info("uhttpd-{} stopped.".format(VERSION))
+        self._tcp_server.run()
 
     #
     # Callbacks
     #
 
-    def handle_request(self, client_socket, tcp_request):
+    def handle_request(self, reader, writer, tcp_request):
         http_request = {
             'tcp': tcp_request
         }
@@ -90,8 +82,8 @@ class Server:
             #
             # parse out the heading line, to get the verb, path, and protocol
             #
-            heading = self.parse_heading(
-                self.readline(client_socket).decode('UTF-8'))
+            line = yield from reader.readline()
+            heading = self.parse_heading(line.decode('UTF-8'))
             logger.debug("Parsed heading {}".format(heading))
             http_request.update(heading)
             #
@@ -113,7 +105,7 @@ class Server:
             headers = {}
             num_headers = 0
             while True:
-                line = self.readline(client_socket)
+                line = yield from reader.readline()
                 if not line or line == b'\r\n':
                     break
                 k, v = Server.parse_header(line.decode('UTF-8'))
@@ -126,14 +118,14 @@ class Server:
             #
             # If the headers have a content length, then read the body
             #
-            content_length = 0
+            #content_length = 0
             if 'content-length' in headers:
                 content_length = int(headers['content-length'])
                 logger.debug("content_length: {}".format(content_length))
                 if content_length > self._config['max_content_length']:
                     raise BadRequestException("Content size exceeds maximum allowable")
                 elif content_length > 0:
-                    body = client_socket.read(content_length)
+                    body = yield from reader.read(content_length)
                     logger.debug("Read body: {}".format(body))
                     http_request['body'] = body
             #
@@ -150,13 +142,13 @@ class Server:
             #
             if self._config['require_auth']:
                 if not 'authorization' in headers:
-                    return self.unauthorized_error(client_socket)
+                    return (yield from self.unauthorized_error(writer))
                 else:
                     remote_addr = tcp_request['remote_addr']
                     is_authorized, user = self.is_authorized(headers['authorization'])
                     if not is_authorized:
                         logger.info("UNAUTHORIZED {}".format(remote_addr))
-                        return self.unauthorized_error(client_socket)
+                        return (yield from self.unauthorized_error(writer))
                     else:
                         logger.info("AUTHORIZED {}".format(remote_addr))
                         http_request['user'] = user
@@ -165,15 +157,15 @@ class Server:
             # to the socket
             #
             response = handler.handle_request(http_request)
-            return Server.response(client_socket, response)
+            return (yield from Server.response(writer, response))
         except BadRequestException as e:
-            return Server.bad_request_error(client_socket, e)
+            return (yield from Server.bad_request_error(writer, e))
         except ForbiddenException as e:
-            return Server.forbidden_error(client_socket, e)
+            return (yield from Server.forbidden_error(writer, e))
         except NotFoundException as e:
-            return Server.not_found_error(client_socket, e)
+            return (yield from Server.not_found_error(writer, e))
         except BaseException as e:
-            return Server.internal_server_error(client_socket, e)
+            return (yield from Server.internal_server_error(writer, e))
         finally:
             gc.collect()
 
@@ -270,7 +262,7 @@ class Server:
 
     @staticmethod
     def response(client_socket, response):
-        Server.serialize(client_socket, response)
+        yield from Server.serialize(client_socket, response)
         return (True, None)
 
     @staticmethod
@@ -278,7 +270,7 @@ class Server:
         #
         # write the heading and headers
         #
-        stream.write("{}\r\n{}\r\n".format(
+        yield from stream.awrite("{}\r\n{}\r\n".format(
             Server.format_heading(response['code']),
             Server.format_headers(Server.update(
                 response['headers'], {'Server': Server.server_name()}
@@ -290,49 +282,49 @@ class Server:
         if 'body' in response:
             body = response['body']
             if body:
-                body(stream)
+                yield from body(stream)
 
-    def unauthorized_error(self, client_socket):
+    def unauthorized_error(self, writer):
         headers = {
             'www-authenticate': "Basic realm={}".format(self._config['realm'])
         }
-        return Server.error(client_socket, 401, "Unauthorized", None, headers)
+        return Server.error(writer, 401, "Unauthorized", None, headers)
 
     @staticmethod
-    def bad_request_error(client_socket, e):
+    def bad_request_error(writer, e):
         error_message = "Bad Request {}:".format(e)
-        return Server.error(client_socket, 400, error_message, e)
+        return (yield from Server.error(writer, 400, error_message, e))
 
     @staticmethod
-    def forbidden_error(client_socket, e):
+    def forbidden_error(writer, e):
         error_message = "Forbidden {}:".format(e)
-        return Server.error(client_socket, 403, error_message, e)
+        return (yield from Server.error(writer, 403, error_message, e))
 
     @staticmethod
-    def not_found_error(client_socket, e):
+    def not_found_error(writer, e):
         error_message = "Not Found: {}".format(e)
-        return Server.error(client_socket, 404, error_message, e)
+        return (yield from Server.error(writer, 404, error_message, e))
 
     @staticmethod
-    def internal_server_error(client_socket, e):
+    def internal_server_error(writer, e):
         sys.print_exception(e)
         error_message = "Internal Server Error: {}".format(e)
-        return Server.error(client_socket, 500, error_message, e)
+        return (yield from Server.error(writer, 500, error_message, e))
 
     @staticmethod
-    def error(client_socket, code, error_message, e, headers={}):
+    def error(writer, code, error_message, e, headers={}):
         logger.debug("Error!  code: {} error_message: {} exception: {}".format(code, error_message, e))
-        ef = lambda stream: Server.stream_error(stream, error_message, e)
+        ef = lambda stream: (yield from Server.stream_error(writer, error_message, e))
         response = Server.generate_error_response(code, ef, headers)
-        return Server.response(client_socket, response)
+        return (yield from Server.response(writer, response))
 
     @staticmethod
-    def stream_error(stream, error_message, e):
-        stream.write(error_message)
+    def stream_error(writer, error_message, e):
+        yield from writer.awrite(error_message)
         if e:
-            stream.write('<pre>')
-            stream.write(Server.stacktrace(e))
-            stream.write('</pre>')
+            yield from writer.awrite('<pre>')
+            yield from writer.awrite(Server.stacktrace(e))
+            yield from writer.awrite('</pre>')
 
     @staticmethod
     def stacktrace(e):
@@ -347,7 +339,7 @@ class Server:
             VERSION).encode('UTF-8')
         # message data in ef will go here
         data2 = '</body></html>'.encode('UTF-8')
-        body = lambda stream: Server.write_html(stream, data1, ef, data2)
+        body = lambda writer: (yield from Server.write_html(writer, data1, ef, data2))
         return {
             'code': code,
             'headers': Server.update({
@@ -357,69 +349,83 @@ class Server:
         }
 
     @staticmethod
-    def write_html(stream, data1, ef, data2):
-        stream.write(data1)
-        ef(stream)
-        stream.write(data2)
+    def write_html(writer, data1, ef, data2):
+        yield from writer.awrite(data1)
+        yield from ef(writer)
+        yield from writer.awrite(data2)
 
 
 SO_REGISTER_HANDLER = const(20)
 
 class TCPServer:
     def __init__(self, port, handler, bind_addr='0.0.0.0',
-                 timeout=30, backlog=5):
+                 timeout=30, backlog=10):
         self._port = port
         self._handler = handler
         self._bind_addr = bind_addr
-        self._timeout = timeout
+        #self._timeout = timeout
         self._backlog = backlog
-        self._server_socket = None
-        self._client_socket = None
 
-    def handle_receive(self, client_socket, tcp_request):
+    def handle_receive(self, reader, writer, tcp_request):
         try:
-            done, response = self._handler.handle_request(client_socket, tcp_request)
+            done, response = yield from self._handler.handle_request(reader, writer, tcp_request)
             if response and len(response) > 0:
-                client_socket.write(response)
+                yield from writer.awrite(response)
             if done:
-                client_socket.close()
                 return False
             else:
-                self._client_socket = client_socket
                 return True
         except Exception as e:
             sys.print_exception(e)
-            client_socket.close()
-            self._client_socket = None
             return False
 
-    def handle_accept(self, server_socket):
-        client_socket, remote_addr = server_socket.accept()
-        client_socket.settimeout(self._timeout)
-        logger.debug("Accepted connection from {}".format(remote_addr))
+    def serve(self, reader, writer):
         tcp_request = {
-            'remote_addr': remote_addr
+            'remote_addr': writer.extra["peername"]
         }
-        while self.handle_receive(client_socket, tcp_request):
-            pass
+        try:
+            while (yield from self.handle_receive(reader, writer, tcp_request)):
+                pass
+        finally:
+            yield from writer.aclose()
 
-    def start(self, background):
-        #
-        # Start the listening socket.  Handle accepts asynchronously
-        # in handle_accept/1
-        #
-        self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._server_socket.bind((self._bind_addr, self._port))
-        self._server_socket.listen(self._backlog)
-        if background:
-            self._server_socket.setsockopt(socket.SOL_SOCKET, SO_REGISTER_HANDLER, self.handle_accept)
-        else:
-            while True:
-                self.handle_accept(self._server_socket)
+    def run(self, debug=False):
+        if debug:
+            import logging
+            logging.basicConfig(level=logging.DEBUG)
 
-    def stop(self):
-        if self._client_socket:
-            self._client_socket.close()
-        if self._server_socket:
-            self._server_socket.close()
+        loop = asyncio.get_event_loop()
+        this = self
+
+        @asyncio.coroutine
+        def serve(reader, writer):
+            yield from this.serve(reader, writer)
+
+        loop.call_soon(asyncio.start_server(
+            client_coro=serve,
+            host=self._bind_addr,
+            port=self._port,
+            backlog=self._backlog
+        ))
+        loop.run_forever()
+        loop.close()
+
+
+class EchoHandler:
+    def __init__(self):
+        pass
+
+    def handle_request(self, reader, writer, tcp_request):
+        data = yield from reader.readline()
+        return False, data
+
+
+
+def test():
+    server = TCPServer(port=80, handler=EchoHandler())
+    server.run()
+
+
+
+
+

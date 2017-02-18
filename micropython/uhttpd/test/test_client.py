@@ -26,8 +26,8 @@
 import unittest
 
 #host = "localhost"
-#host = "192.168.1.174"
-host = "192.168.1.180"
+host = "192.168.1.174"
+#host = "192.168.1.180"
 
 class Connection:
 

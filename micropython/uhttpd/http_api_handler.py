@@ -83,7 +83,7 @@ class Handler:
                 content_type = "application/binary"
             else:
                 raise Exception("Response from API Handler is neither dict nor bytearray nor None")
-            body = lambda stream: stream.write(data)
+            body = lambda stream: stream.awrite(data)
         else:
             data = body = None
         ret = {
