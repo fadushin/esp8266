@@ -23,14 +23,60 @@ The source modules that form the Web Console application are distributed under a
 
 # Installation
 
-Start by creating a 
+These instructions assume you have built and installed the `uhttpd` application on your device.  Note that for the esp8266, you will need to burn the uhttpd modules (including the file and api handlers, logging and uasyncio dependencies) as frozen bytecode into your device.  There simply is not enough memory on these devices to run this application off the python vFat file system.
+
+Start by creating a directory tree on your device that contains a `/www`, `/www/js`, and `/www/js/lib` directory:
 
     >>> import os
     >>> os.mkdir('/www')
     >>> os.mkdir('/www/js')
     >>> os.mkdir('/www/js/lib')
 
+Upload the files in the `www` directory to your device in their corresponding locations on the device.  For example:
+
+    prompt$ IP_ADDRESS = # enter the IP address of your device
+    prompt$ cd .../esp8266/micropython/web-console
+    prompt$ for i in $(find www -type f); do webrepl_cli.py $i ${IP_ADDRESS}:/$i; done
+    ...
 
 
+Updload the `api.mpy` to your device, preferably as frozen bytecode burned into your image, but alternatively in the `/` or `/lib` directory of your device.
+
+You may now run the HTTP server, as follows:
+
+    def web_console():
+        import uhttpd
+        import http_file_handler
+        import http_api_handler
+        import api
+
+        api_handler = http_api_handler.Handler([
+            (['system'], api.SystemAPIHandler()),
+            (['memory'], api.MemoryAPIHandler()),
+            (['flash'], api.FlashAPIHandler()),
+            (['network'], api.NetworkAPIHandler())
+        ])
+        file_handler = http_file_handler.Handler()
+        server = uhttpd.Server([
+            ('/api', api_handler),
+            ('/', file_handler)
+        ], {'max_headers': 50, 'backlog': 10})
+        server.run()
+
+For example:
+
+    >>> web_console()
+    loaded sink console
+    2000-01-01T05:55:49.005 [info] esp8266: uhttpd-master running...
+
+You may now connect to your device over a web browser, e.g.,
+
+http://192.168.1.174/
+
+The application should load into your browser, and after a short load period, should give you a menu of information about your device, such as system information, memory and disk usage, network status, etc.  For example,
+
+![Web Console](/micropython/web-console/images/memory-screenshot.png)
 
 # Architecture
+
+TODO

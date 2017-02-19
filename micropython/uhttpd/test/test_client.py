@@ -25,6 +25,8 @@
 #
 import unittest
 import threading
+import time
+import random
 
 #host = "localhost"
 host = "192.168.1.174"
@@ -247,7 +249,7 @@ class HttpdTest(unittest.TestCase):
 
     def test_concurrent_file(self):
         threads = []
-        for i in range(3):
+        for i in range(5):
             t = threading.Thread(target=self.get_test_js)
             threads.append(t)
             t.start()
@@ -255,14 +257,13 @@ class HttpdTest(unittest.TestCase):
             t.join()
 
     def get_test_js(self):
-        import time
         for i in range(10):
             try:
                 self.verify_get('/test/foo/bar/test.js', expected_status=200, expected_content_type='text/javascript', expected_body=b'{\'foo\': "bar"}')
                 print("+", end="", flush=True)
             except BaseException as e:
                 print("Error: thread: {} i: {} e: {}".format(threading.current_thread(), i, e))
-            time.sleep(0.1)
+            time.sleep(random.random())
 
 
 if __name__ == '__main__':

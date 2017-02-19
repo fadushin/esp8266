@@ -52,8 +52,25 @@ Both frozen and pre-compiled bytecode require building the [micropython](https:/
 
 For production applications, it is recommended to freeze the `uhttpd` bytecode to your firmware image.  The step-by-step details for building micropython firmware images are outside of the scope of this document, but essentially, all you need to do is:
 
+* Copy (or symlink) the following third-party dependencies from the [micropython-lib](https://github.com/micropython/micropython-lib) repository:
+    * [uasyncio.core](https://github.com/micropython/micropython-lib/tree/master/uasyncio.core)
+    * [uasyncio](https://github.com/micropython/micropython-lib/tree/master/uasyncio)
+    * [logging](https://github.com/micropython/micropython-lib/tree/master/logging)
+* Copy (or symlink) the `ulog.py` and `console_sink.py` python modules from the `logging` directory to the `modules` directory of your `micropython/esp8266` directory
 * Copy (or symlink) the `uhttpd` python modules to the `modules` directory of your `micropython/esp8266` directory
 * Build and deploy your firmware image as described in the [micropython](https://github.com/micropython/micropython/tree/master/esp8266) instructions
+
+Your modules directory should contains the following links (or copies), where ${THIS_REPO} is your local working copy of this repository, and ${ML_REPO} is your local working copy of the [micropython-lib](https://github.com/micropython/micropython-lib) repository
+
+    uhttpd.py@ -> ${THIS_REPO}/micropython/uhttpd/uhttpd.py
+    http_api_handler.py@ -> ${THIS_REPO}/micropython/uhttpd/http_api_handler.py
+    http_file_handler.py@ -> ${THIS_REPO}/micropython/uhttpd/http_file_handler.py
+    ulog.py@ -> ${THIS_REPO}/micropython/logging/ulog.py
+    console_sink.py@ -> ${THIS_REPO}/micropython/logging/console_sink.py
+
+    logging.py@ -> ${ML_REPO}/logging/logging.p
+    __init__.py@ -> ${ML_REPO}/uasyncio/uasyncio/__init__.py
+    core.py@ -> ${ML_REPO}/uasyncio.core/uasyncio/core.py
 
 ### Pre-compiled modules
 
