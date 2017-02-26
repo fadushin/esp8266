@@ -28,13 +28,12 @@ import threading
 import time
 import random
 
-#host = "localhost"
-host = "192.168.1.174"
-#host = "192.168.1.180"
+host = "localhost"
+port = 80
 
 class Connection:
 
-    def __init__(self, host, port=80):
+    def __init__(self, host, port=8080):
         self.connection = None
         self.host = host
         self.port = int(port)
@@ -93,7 +92,7 @@ def basic_auth_headers(username, password):
 class HttpdTest(unittest.TestCase):
     def __init__(self, methodName):
         super().__init__(methodName)
-        self._connection = Connection(host)
+        self._connection = Connection(host=host, port=port)
 
     def test_no_handler(self):
         self.verify_get('/', expected_status=404, expected_content_type='text/html')
@@ -126,12 +125,12 @@ class HttpdTest(unittest.TestCase):
         self.verify_get('/test/..', expected_status=403, expected_content_type='text/html')
 
     def test_max_headers(self):
-        # server should drop the connection
+        # server should drop the connection with ESP8266, but not unix micropython
         with self.assertRaises(ConnectionResetError):
             self.verify_get('/test', expected_status=400, additional_headers=make_headers(55))
 
     def test_max_body(self):
-        # server should drop the connection
+        # server should drop the connection with ESP8266, but not unix micropython
         with self.assertRaises(ConnectionResetError):
             self.verify_put('/test', expected_status=400, body=bytearray(2048))
 
@@ -269,7 +268,14 @@ class HttpdTest(unittest.TestCase):
 if __name__ == '__main__':
     import sys
     if len(sys.argv) < 2:
-        print("Syntax: test_client.py <host>")
+        print("Syntax: test_client.py <host> [<port>]")
         sys.exit(1)
-    host = sys.argv.pop()
+    print(sys.argv)
+    host = sys.argv[1]
+    print(host)
+    if len(sys.argv) == 3:
+        port = sys.argv[2]
+        print(port)
+        sys.argv.pop()
+    sys.argv.pop()
     unittest.main()

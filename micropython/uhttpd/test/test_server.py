@@ -23,31 +23,34 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-import os
+import uos
 import uhttpd
+from ulog import logger
+
 
 def mkdir(path):
     try:
-        os.mkdir(path)
+        uos.mkdir(path)
     except OSError as e:
         pass
 
 
 def write(filename, str):
+    logger.info("Writing to {}...".format(filename))
     f = open(filename, 'w')
     f.write(str)
     f.close()
 
 
-def init():
-    print("Initializing...")
-    mkdir('/test')
-    write('/test/index.html', "<html><body>Hello World!</body></html>")
-    mkdir('/test/foo')
-    write('/test/foo/test.txt', "test")
-    mkdir('/test/foo/bar')
-    write('/test/foo/bar/test.js', "{'foo': \"bar\"}")
-    write('/test/foo/bar/test.css', "html")
+def init(root_path='/test'):
+    print("Initializing from {}...".format(root_path))
+    mkdir('{}'.format(root_path))
+    write('{}/index.html'.format(root_path), "<html><body>Hello World!</body></html>")
+    mkdir('{}/foo'.format(root_path))
+    write('{}/foo/test.txt'.format(root_path), "test")
+    mkdir('{}/foo/bar'.format(root_path))
+    write('{}/foo/bar/test.js'.format(root_path), "{'foo': \"bar\"}")
+    write('{}/foo/bar/test.css'.format(root_path), "html")
 
 
 class TestAPIHandler:
@@ -88,11 +91,11 @@ class TestAPIHandler:
 
 server = None
 
-def run(backlog=10):
+def run(root_path='/test', port=80, backlog=10):
     print("Starting test server ...")
     import uhttpd
     import http_file_handler
-    file_handler = http_file_handler.Handler(root_path='/test')
+    file_handler = http_file_handler.Handler(root_path=root_path)
     import http_api_handler
     api_handler = http_api_handler.Handler(
         [(['test'], TestAPIHandler())]
@@ -102,12 +105,13 @@ def run(backlog=10):
         ('/api', api_handler),
         ('/test', file_handler)
     ], {
+        'port': port,
         'require_auth': True,
         'backlog': backlog
     })
     server.run()
 
 
-def test():
-    init()
-    run()
+def test(root_path='/test', port=80):
+    init(root_path=root_path)
+    run(root_path=root_path, port=port)

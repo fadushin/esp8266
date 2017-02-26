@@ -25,7 +25,7 @@
 #
 
 import sys
-import time
+import utime
 
 class Log :
     '''
@@ -101,9 +101,14 @@ class Log :
             sys.print_exception(e)
 
     def datetimestr(self) :
-        year, month, day, hour, minute, second, millis, _tzinfo = time.localtime()
-        return "%d-%02d-%02dT%02d:%02d:%02d.%03d" % (year, month, day, hour, minute, second, millis)
-            
+        import sys
+        if sys.platform == 'esp8266':
+            year, month, day, hour, minute, second, millis, _tzinfo = utime.localtime()
+            return "%d-%02d-%02dT%02d:%02d:%02d.%03d" % (year, month, day, hour, minute, second, millis)
+        else:
+            return utime.strftime("%Y-%m-%dT%H:%M:%S.0000")
+
+
 
 def module_to_dict(mod) :
     ret = {}

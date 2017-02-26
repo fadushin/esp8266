@@ -23,7 +23,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-import json
+import ujson
 import uhttpd
 
 
@@ -48,7 +48,7 @@ class Handler:
             headers = http_request['headers']
             if 'body' in http_request and 'content-type' in headers and headers['content-type'] == "application/json":
                 try:
-                    json_body = json.loads(http_request['body'])
+                    json_body = ujson.loads(http_request['body'])
                 except Exception as e:
                     raise uhttpd.BadRequestException("Failed to load JSON: {}".format(e))
             verb = http_request['verb']
@@ -76,7 +76,7 @@ class Handler:
             raise uhttpd.NotFoundException(error_message)
         if response is not None:
             if type(response) is dict:
-                data = json.dumps(response).encode('UTF-8')
+                data = ujson.dumps(response).encode('UTF-8')
                 content_type = "application/json"
             elif type(response) is bytes:
                 data = response

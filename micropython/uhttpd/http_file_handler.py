@@ -23,7 +23,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-import os
+import uos
 from ulog import logger
 import uhttpd
 
@@ -36,14 +36,27 @@ CONTENT_TYPE_MAP = {
 
 def is_dir(path):
     try:
-        os.listdir(path)
+        listdir(path)
         return True
     except OSError:
         return False
 
+
+def listdir(path):
+    import sys
+    if sys.platform == 'esp8266':
+        return uos.listdir(path)
+    else:
+        ret = []
+        for name, size, modified in uos.ilistdir(path):
+            ret.append(name)
+        if ret == []:
+            raise OSError()
+        return ret
+
 def exists(path):
     try:
-        os.stat(path)
+        uos.stat(path)
         return True
     except OSError:
         return False
@@ -179,7 +192,7 @@ class Handler:
         components_len = len(components)
         if components_len > 0:
             data += "<li><a href=\"{}\">..</a></li>\n".format(self.to_path(components[:components_len-1]))
-        files = os.listdir(absolute_path)
+        files = listdir(absolute_path)
         for f in files:
             tmp = components.copy()
             tmp.append(f)
@@ -218,7 +231,7 @@ class Handler:
 
     @staticmethod
     def file_size(path):
-        return os.stat(path)[6]
+        return uos.stat(path)[6]
 
     @staticmethod
     def get_suffix(path):
