@@ -24,7 +24,7 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 import uos
-from ulog import logger
+import logging
 import uhttpd
 
 CONTENT_TYPE_MAP = {
@@ -91,14 +91,14 @@ class Handler:
         #
         remote_addr = http_request['tcp']['remote_addr']
         if not self.is_prefix(self._root_path, absolute_path):
-            logger.info(
+            logging.info(
                 "FORBIDDEN {} {}".format(remote_addr, absolute_path))
             raise uhttpd.ForbiddenException(absolute_path)
         #
         # If the path doesn't exist, 404 out
         #
         if not exists(absolute_path):
-            logger.info(
+            logging.info(
                 "NOT_FOUND {} {}".format(remote_addr, absolute_path))
             raise uhttpd.NotFoundException(absolute_path)
         #
@@ -108,14 +108,14 @@ class Handler:
             index_path = absolute_path + "/index.html"
             if exists(index_path):
                 response = self.create_file_response(index_path)
-                logger.info("ACCESS {} {}".format(remote_addr, index_path))
+                logging.info("ACCESS {} {}".format(remote_addr, index_path))
                 return response
             else:
-                logger.info("ACCESS {} {}".format(remote_addr, absolute_path))
+                logging.info("ACCESS {} {}".format(remote_addr, absolute_path))
                 prefix = http_request['prefix']
                 return self.create_dir_listing_response(absolute_path)
         else:
-            logger.info("ACCESS {} {}".format(remote_addr, absolute_path))
+            logging.info("ACCESS {} {}".format(remote_addr, absolute_path))
             return self.create_file_response(absolute_path)
 
     #

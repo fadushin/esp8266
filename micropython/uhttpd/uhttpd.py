@@ -24,7 +24,7 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 import sys
-from ulog import logger
+import logging
 import gc
 import uasyncio as asyncio
 
@@ -56,7 +56,7 @@ class Server:
         self._tcp_server = TCPServer(
             bind_addr=self._config['bind_addr'],
             port=self._config['port'],
-            timeout=self._config['timeout'],
+            #timeout=self._config['timeout'],
             handler=self,
             backlog=self._config['backlog']
         )
@@ -66,7 +66,7 @@ class Server:
     #
 
     def run(self):
-        logger.info("uhttpd-{} running...".format(VERSION))
+        logging.info("uhttpd-{} running...".format(VERSION))
         self._tcp_server.run()
 
     #
@@ -78,13 +78,12 @@ class Server:
             'tcp': tcp_request
         }
         try:
-            gc.collect()
             #
             # parse out the heading line, to get the verb, path, and protocol
             #
             line = yield from reader.readline()
             heading = self.parse_heading(line.decode('UTF-8'))
-            logger.debug("Parsed heading {}".format(heading))
+            #logging.debug("Parsed heading {}".format(heading))
             http_request.update(heading)
             #
             # find the handler for the specified path.  If we don't have
@@ -97,7 +96,7 @@ class Server:
                 if path.startswith(prefix):
                     http_request['prefix'] = prefix
                     handler = h
-                    logger.debug("Found handler for prefix {}".format(prefix))
+                    #logging.debug("Found handler for prefix {}".format(prefix))
                     break
             #
             # Parse out the headers
@@ -113,7 +112,7 @@ class Server:
                 num_headers += 1
                 if num_headers > self._config['max_headers']:
                     raise BadRequestException("Number of headers exceeds maximum allowable")
-            logger.debug("Parsed headers {}".format(headers))
+            #logging.debug("Parsed headers {}".format(headers))
             http_request['headers'] = headers
             #
             # If the headers have a content length, then read the body
@@ -121,19 +120,18 @@ class Server:
             #content_length = 0
             if 'content-length' in headers:
                 content_length = int(headers['content-length'])
-                logger.debug("content_length: {}".format(content_length))
+                #logging.debug("content_length: {}".format(content_length))
                 if content_length > self._config['max_content_length']:
                     raise BadRequestException("Content size exceeds maximum allowable")
                 elif content_length > 0:
                     body = yield from reader.read(content_length)
-                    logger.debug("Read body: {}".format(body))
+                    #logging.debug("Read body: {}".format(body))
                     http_request['body'] = body
             #
             # If there is no handler, then raise a NotFound exception
             #
             if not handler:
                 raise NotFoundException("No Handler for path {}".format(path))
-
             #
             # Authenticate the user, if configured to do so.  If required
             # and there is no authorization header, reply with a 401 and
@@ -147,10 +145,10 @@ class Server:
                     remote_addr = tcp_request['remote_addr']
                     is_authorized, user = self.is_authorized(headers['authorization'])
                     if not is_authorized:
-                        logger.info("UNAUTHORIZED {}".format(remote_addr))
+                        logging.info("UNAUTHORIZED {}".format(remote_addr))
                         return (yield from self.unauthorized_error(writer))
                     else:
-                        logger.info("AUTHORIZED {}".format(remote_addr))
+                        logging.info("AUTHORIZED {}".format(remote_addr))
                         http_request['user'] = user
             #
             # get the response from the active handler and serialize it
@@ -166,8 +164,6 @@ class Server:
             return (yield from Server.not_found_error(writer, e))
         except BaseException as e:
             return (yield from Server.internal_server_error(writer, e))
-        finally:
-            gc.collect()
 
     #
     # Internal operations
@@ -183,7 +179,7 @@ class Server:
         return {
             'bind_addr': '0.0.0.0',
             'port': 80,
-            'timeout': 30,
+            #'timeout': 30,
             'require_auth': False,
             'realm': "esp8266",
             'user': "admin",
@@ -193,8 +189,8 @@ class Server:
             'backlog': 5
         }
 
-    def readline(self, client_socket):
-        return client_socket.readline()
+    #def readline(self, client_socket):
+    #    return client_socket.readline()
 
     @staticmethod
     def parse_heading(line):
@@ -313,7 +309,7 @@ class Server:
 
     @staticmethod
     def error(writer, code, error_message, e, headers={}):
-        logger.debug("Error!  code: {} error_message: {} exception: {}".format(code, error_message, e))
+        #logging.debug("Error!  code: {} error_message: {} exception: {}".format(code, error_message, e))
         ef = lambda stream: (yield from Server.stream_error(writer, error_message, e))
         response = Server.generate_error_response(code, ef, headers)
         return (yield from Server.response(writer, response))
@@ -355,11 +351,10 @@ class Server:
         yield from writer.awrite(data2)
 
 
-SO_REGISTER_HANDLER = const(20)
-
 class TCPServer:
     def __init__(self, port, handler, bind_addr='0.0.0.0',
-                 timeout=30, backlog=10):
+                 #timeout=30,
+                 backlog=10):
         self._port = port
         self._handler = handler
         self._bind_addr = bind_addr
@@ -383,11 +378,13 @@ class TCPServer:
         tcp_request = {
             'remote_addr': writer.extra["peername"]
         }
+        gc.collect()
         try:
             while (yield from self.handle_receive(reader, writer, tcp_request)):
-                pass
+                gc.collect()
         finally:
             yield from writer.aclose()
+            gc.collect()
 
     def run(self, debug=False):
         if debug:
@@ -411,19 +408,19 @@ class TCPServer:
         loop.close()
 
 
-class EchoHandler:
-    def __init__(self):
-        pass
+#class EchoHandler:
+#    def __init__(self):
+#        pass
+#
+#    def handle_request(self, reader, writer, tcp_request):
+#        data = yield from reader.readline()
+#        return False, data
 
-    def handle_request(self, reader, writer, tcp_request):
-        data = yield from reader.readline()
-        return False, data
 
 
-
-def test():
-    server = TCPServer(port=80, handler=EchoHandler())
-    server.run()
+#def test():
+#    server = TCPServer(port=80, handler=EchoHandler())
+#   server.run()
 
 
 

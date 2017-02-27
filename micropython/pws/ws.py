@@ -24,7 +24,8 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 '''
 import time
-from log import logger
+#from log import logger
+import logging
 import util
 
 class WeatherStation :
@@ -60,7 +61,7 @@ class WeatherStation :
         '''
         while True :
             self.tick(pin)
-            logger.debug("Sleeping %s secs ..." % sleep_s)
+            logging.debug("Sleeping %s secs ..." % sleep_s)
             time.sleep(sleep_s)
     
     def tick(self, pin=2) :
@@ -71,11 +72,11 @@ class WeatherStation :
             d.measure()
             tempf = 32.0 + 1.8 * d.temperature()
             humidity = d.humidity()
-            logger.debug("Read measurements off DHT11: temp(f): %s humidity: %s" % (tempf, humidity))
+            logging.debug("Read measurements off DHT11: temp(f): %s humidity: %s" % (tempf, humidity))
             self._upload(tempf, humidity)
             util.clear_led_error()
         except Exception as E :
-            logger.error("An error occurred taking measurements: %s", E)
+            logging.error("An error occurred taking measurements: %s", E)
             util.set_led_error()
     
     ##
@@ -90,15 +91,15 @@ class WeatherStation :
         s = socket.socket()
         s.connect(addr)
         request = b"GET %s HTTP/1.0\r\nHost: weatherstation.wunderground.com\r\nUser-Agent: curl/7.43.0\r\nAccept: */*\r\n\r\n" % url
-        logger.debug("Request: %s" % request)
+        logging.debug("Request: %s" % request)
         val = s.send(request)
-        logger.debug("val: %s" % val)
-        logger.debug("Response: %s" % s.read())
+        logging.debug("val: %s" % val)
+        logging.debug("Response: %s" % s.read())
         s.close()
-        logger.info("Uploaded tempf: %s humidity: %s to wunderground.com stationid %s", (tempf, humidity, self._stationid))
+        logging.info("Uploaded tempf: %s humidity: %s to wunderground.com stationid %s", (tempf, humidity, self._stationid))
 
 try :
     import ws_config
     station = WeatherStation(ws_config.stationid, ws_config.password)
 except Exception as E :
-    logger.error("An error occurred creating a weather station: %s" % E)
+    logging.error("An error occurred creating a weather station: %s" % E)

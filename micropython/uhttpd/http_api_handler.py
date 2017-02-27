@@ -29,9 +29,6 @@ import uhttpd
 
 class Handler:
     def __init__(self, handlers):
-        """
-        :param handlers:  an ordered list of pairs from [string()] -> APIHandler
-        """
         self._handlers = handlers
 
     #

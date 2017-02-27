@@ -25,7 +25,6 @@
 #
 import uos
 import uhttpd
-from ulog import logger
 
 
 def mkdir(path):
@@ -36,7 +35,6 @@ def mkdir(path):
 
 
 def write(filename, str):
-    logger.info("Writing to {}...".format(filename))
     f = open(filename, 'w')
     f.write(str)
     f.close()

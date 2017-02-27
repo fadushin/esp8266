@@ -16,7 +16,7 @@ import os
 import esp
 import uhttpd
 import network
-from ulog import logger
+import logging
 
 
 class APIHandler:
@@ -153,16 +153,16 @@ class NetworkAPIHandler:
     #
 
     def get(self, api_request):
-        logger.info("get {}".format(api_request))
+        logging.info("get {}".format(api_request))
         context = api_request['context']
         return self.get_network_stats(context)
 
     def post(self, api_request):
-        logger.info("post {}".format(api_request))
+        logging.info("post {}".format(api_request))
         return self.save(api_request)
 
     def put(self, api_request):
-        logger.info("put {}".format(api_request))
+        logging.info("put {}".format(api_request))
         return self.save(api_request)
 
     #
@@ -265,7 +265,7 @@ class NetworkAPIHandler:
 
     def save(self, api_request):
         context = api_request['context']
-        logger.info("context: {}".format(context))
+        logging.info("context: {}".format(context))
         if context == ['ap', 'config']:
             return self.save_ap_config(api_request)
         else:
@@ -274,7 +274,7 @@ class NetworkAPIHandler:
     def save_ap_config(self, api_request):
         config = api_request['body']
         ap = network.WLAN(network.AP_IF)
-        logger.info("config: {}".format(config))
+        logging.info("config: {}".format(config))
         ap.config(
             #mac=config['mac'],
             essid=config['essid'],
