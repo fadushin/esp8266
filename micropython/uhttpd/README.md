@@ -67,10 +67,14 @@ Your modules directory should contains the following links (or copies), where ${
     http_file_handler.py@ -> ${THIS_REPO}/micropython/uhttpd/http_file_handler.py
     ulog.py@ -> ${THIS_REPO}/micropython/logging/ulog.py
     console_sink.py@ -> ${THIS_REPO}/micropython/logging/console_sink.py
+    
+    logging.py@ -> ${ML_REPO}/logging/logging.py
 
-    logging.py@ -> ${ML_REPO}/logging/logging.p
-    __init__.py@ -> ${ML_REPO}/uasyncio/uasyncio/__init__.py
-    core.py@ -> ${ML_REPO}/uasyncio.core/uasyncio/core.py
+make a directory called uasyncio under modules directory
+
+
+    uasyncio/__init__.py@ -> ${ML_REPO}/uasyncio/uasyncio/__init__.py
+    uasyncio/core.py@ -> ${ML_REPO}/uasyncio.core/uasyncio/core.py
 
 ### Pre-compiled modules
 
@@ -125,7 +129,7 @@ For example, to start the server with the file handler rooted off the `/www` pat
     >>> import uhttpd
     >>> import http_file_handler
     >>> server = uhttpd.Server([('/', http_file_handler.Handler('/www'))])
-    >>> server.start()
+    >>> server.run()
 
 The above sequence of statements will start the `uhttp` server, listening on port 80.  Any HTTP requests beginning with the URL prefix '/' (viz., all requests) will be routed to the `http_file_handler.Handler`, which will service files on the micropython file system under the directory `/www`.  Attempts to read data outside of this path will fail with a 403 (forbidden) exception.
 
@@ -153,7 +157,7 @@ The `uhttpd.Server` supports HTTP Basic authentication.  By default, HTTP authen
         [('/', http_file_handler.Handler('/www'))],
         config={'require_auth': True}
     )
-    >>> server.start()
+    >>> server.run()
 
 The default HTTP user name is `admin`, and the default password is `uhttpD`, but these values are configurable, as described in the _Configuration_ section, below.  This server only supports one username and password for each server instance.
 
@@ -251,7 +255,7 @@ then you can install the API Handler as follows:
     >>> api_handler = http_api_handler.Handler([(['test'], my_api.Handler())])
     >>> import uhttpd
     >>> server = uhttpd.Server([('/api', api_handler)])
-    >>> server.start()
+    >>> server.run()
     2016-12-18T10:24:33.005 [info] esp8266: uhttpd-master started.
 
 You can then make HTTP requests to your handler via:
@@ -333,7 +337,7 @@ For example, given the following construction:
             ('/gnu', handler2),
             ('/', handler3)
         ])
-    >>> server.start()
+    >>> server.run()
 
 a request of the form `http://host/foo/bar/` will be handled by `handler1`, whereas a request of the form `http://host/gnat/` will be handled by `handler3`.
 
