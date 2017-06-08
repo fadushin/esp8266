@@ -301,7 +301,7 @@ The return value from these operations may one of the following:
 
 * A JSON structure (i.e., python Dictionary) that can be converted to a JSON string:  In this case, the body of the HTTP response is the converted JSON string, and the content type is set to `application/json`.
 * A raw byte array:  In this case, the raw byte array is returned in the body of the HTTP response, and the content type is set to `application/binary`.
-* A string: In this case, the string is returned as a body of HTTP response. Content-type is set to "text/html; charset=utf-8"
+* A string: In this case, the string is returned as a body of HTTP response. Content-type is set to `text/html; charset=utf-8`
 * `None`: In this case, the HTTP response contains no body.
 
 ### Exception Semantics
