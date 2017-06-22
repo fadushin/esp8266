@@ -213,15 +213,16 @@ class Server:
     def is_authorized(self, authorization):
         import ubinascii
         try:
-            tmp = authorization.split()
-            if tmp[0].lower() == "basic":
-                str = ubinascii.a2b_base64(tmp[1].strip().encode()).decode()
-                ra = str.split(':')
-                auth_result = ra[0] == self._config['user'] and ra[1] == self._config['password']
-                return auth_result, ra[0]
+            auth_type, auth_data = authorization.split()
+            if auth_type.lower() == "basic":
+                user, password = ubinascii.a2b_base64(auth_data.strip().encode()
+                                                      ).decode().split(':')
+                auth_result = user == self._config['user'] and \
+                              password == self._config['password']
+                return auth_result, user
             else:
                 raise BadRequestException(
-                    "Unsupported authorization method: {}".format(tmp[0]))
+                    "Unsupported authorization method: {}".format(auth_type))
         except Exception as e:
             raise BadRequestException(e)
 
