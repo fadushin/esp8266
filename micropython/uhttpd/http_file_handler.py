@@ -63,7 +63,7 @@ def exists(path):
 
 class Handler:
     def __init__(self, root_path='/www', block_size=1024):
-        if not exists(root_path) or not is_dir(root_path):
+        if not any([exists(root_path), is_dir(root_path)]):
             msg = "Root path {} is not an existing directory".format(root_path)
             raise Exception(msg)
         self._root_path = root_path
