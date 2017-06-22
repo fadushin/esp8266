@@ -50,7 +50,7 @@ def listdir(path):
         ret = []
         for name, size, modified in uos.ilistdir(path):
             ret.append(name)
-        if ret == []:
+        if not ret:
             raise OSError()
         return ret
 
