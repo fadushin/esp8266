@@ -106,20 +106,22 @@ class Handler:
 
     @staticmethod
     def extract_query(path):
-        components = path.split("?")
-        if len(components) == 1:
-            return path, None
-        elif len(components) > 2:
+        try:
+            path_, query = path.split("?")
+            if not query:
+                return path, None
+        except ValueError:
             raise uhttpd.BadRequestException("Malformed path: {}".format(path))
-        path_part = components[0]
-        query_part = components[1]
-        qparam_components = query_part.split("&")
         query_params = {}
-        for qparam_component in qparam_components:
-            if qparam_component.strip() == '':
-                continue
-            qparam = qparam_component.split("=")
-            if len(qparam) != 2 or not qparam[0]:
-                raise uhttpd.BadRequestException("Invalid query parameter: {}".format(qparam_component))
-            query_params[qparam[0]] = qparam[1]
-        return path_part, query_params
+        components = [component for component in query.split("&")
+                      if component.strip()]
+        for qparam_component in components:
+            try:
+                parameter, value = qparam_component.split("=")
+                if not parameter:
+                    raise ValueError
+            except ValueError:
+                message = "Invalid query parameter: {}".format(qparam_component)
+                raise uhttpd.BadRequestException(message)
+            query_params[parameter] = value
+        return path_, query_params
