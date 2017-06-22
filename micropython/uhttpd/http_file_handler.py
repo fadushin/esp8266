@@ -162,12 +162,10 @@ class Handler:
         components = full_path.split('/')
         tmp = []
         for component in components:
-            if component == '':
+            if not component or component == '.':
                 pass
             elif component == "..":
                 tmp = tmp[:len(tmp) - 1]
-            elif component == '.':
-                pass
             else:
                 tmp.append(component)
         return "/{}".format('/'.join(tmp))
