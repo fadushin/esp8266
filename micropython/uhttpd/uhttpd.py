@@ -330,14 +330,14 @@ class Server:
             VERSION).encode('UTF-8')
         # message data in ef will go here
         data2 = '</body></html>'.encode('UTF-8')
-        body = lambda writer: (yield from Server.write_html(writer, data1, ef, data2))
-        return {
-            'code': code,
-            'headers': Server.update({
-                'content-type': "text/html",
-            }, headers),
-            'body': body
-        }
+        body = lambda writer: (yield from Server.write_html(writer,
+                                                            data1,
+                                                            ef,
+                                                            data2))
+        return {'code': code,
+                'headers': Server.update({'content-type': "text/html"},
+                                         headers),
+                'body': body}
 
     @staticmethod
     def write_html(writer, data1, ef, data2):
