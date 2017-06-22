@@ -49,6 +49,13 @@ def get_relative_path(http_request):
     return path[len(prefix):]
 
 
+HTTP_CODES = {200: 'OK',
+              400: 'Bad Request',
+              401: 'Unauthorized',
+              403: 'Forbidden',
+              404: 'Not Found',
+              500: 'Internal Server Error'}
+
 class Server:
     def __init__(self, handlers, config=None):
         self._handlers = handlers
@@ -236,20 +243,7 @@ class Server:
 
     @staticmethod
     def lookup_code(code):
-        if code == 200:
-            return "OK"
-        elif code == 400:
-            return "Bad Request"
-        elif code == 401:
-            return "Unauthorized"
-        elif code == 403:
-            return "Forbidden"
-        elif code == 404:
-            return "Not Found"
-        elif code == 500:
-            return "Internal Server Error"
-        else:
-            return "Unknown"
+        return HTTP_CODES.get(code, "Unknown")
 
     @staticmethod
     def format_headers(headers):
