@@ -41,14 +41,15 @@ class Handler:
         components = path_part.strip('/').split('/')
         prefix, handler, context = self.find_handler(components)
         if handler:
-            json_body = None
             headers = http_request['headers']
-            if 'body' in http_request and 'content-type' in headers and headers['content-type'] == "application/json":
+            json_body = None
+            if all(['body' in http_request,
+                    headers.get('content-type') == "application/json"]):
                 try:
                     json_body = ujson.loads(http_request['body'])
                 except Exception as e:
                     raise uhttpd.BadRequestException("Failed to load JSON: {}".format(e))
-            verb = http_request['verb']
+            verb = http_request['verb'].lower()
             api_request = {
                 'prefix': prefix,
                 'context': context,
@@ -56,15 +57,17 @@ class Handler:
                 'body': json_body,
                 'http': http_request
             }
-            if verb == 'get':
-                response = handler.get(api_request)
-            elif verb == 'put':
-                response = handler.put(api_request)
-            elif verb == 'post':
-                response = handler.post(api_request)
-            elif verb == 'delete':
-                response = handler.delete(api_request)
-            else:
+            try:
+                response = getattr(handler, verb)(api_request)
+                # if verb == 'get':
+                #     response = handler.get
+                # elif verb == 'put':
+                #     response = handler.put(api_request)
+                # elif verb == 'post':
+                #     response = handler.post(api_request)
+                # elif verb == 'delete':
+                #     response = handler.delete(api_request)
+            except AttributeError:
                 # TODO add support for more verbs!
                 error_message = "Unsupported verb: {}".format(verb)
                 raise uhttpd.BadRequestException(error_message)
