@@ -271,10 +271,9 @@ class Server:
         #
         # Write the body, if it's present
         #
-        if 'body' in response:
-            body = response['body']
-            if body:
-                yield from body(stream)
+        body = response.get('body')
+        if body:
+            yield from body(stream)
 
     def unauthorized_error(self, writer):
         headers = {
