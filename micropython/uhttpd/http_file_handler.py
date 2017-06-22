@@ -112,7 +112,8 @@ class Handler:
                 return response
             else:
                 logging.info("ACCESS {} {}".format(remote_addr, absolute_path))
-                prefix = http_request['prefix']
+                # this is not used
+                # prefix = http_request['prefix']
                 return self.create_dir_listing_response(absolute_path)
         else:
             logging.info("ACCESS {} {}".format(remote_addr, absolute_path))
