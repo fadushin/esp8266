@@ -50,8 +50,9 @@ def get_relative_path(http_request):
 
 
 class Server:
-    def __init__(self, handlers, config={}):
+    def __init__(self, handlers, config=None):
         self._handlers = handlers
+        config = {} if config is None else config
         self._config = self.update(self.default_config(), config)
         self._tcp_server = TCPServer(
             bind_addr=self._config['bind_addr'],
