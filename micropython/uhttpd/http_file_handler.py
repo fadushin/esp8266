@@ -216,22 +216,14 @@ class Handler:
 
     @staticmethod
     def filter(f, el):
-        ret = []
-        for e in el:
-            if f(e):
-                ret.append(e)
-        return ret
+        return [e for e in el if f(e)]
 
     @staticmethod
     def create_response(code, content_type, length, body):
-        return {
-            'code': code,
-            'headers': {
-                'content-type': content_type,
-                'content-length': length
-            },
-            'body': body
-        }
+        return {'code': code,
+                'headers': {'content-type': content_type,
+                            'content-length': length},
+                'body': body}
 
     @staticmethod
     def file_size(path):
