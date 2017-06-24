@@ -9,7 +9,7 @@ Upload `test_server.py` to your ESP8266 using `webrepl` or equivalent, and run t
     >>> import test_server
     >>> test_server.init()
     Initializing...
-    >>> test_server.start()
+    >>> test_server.run()
     Starting test server ...
     loaded sink console
     2000-01-01T15:45:02.005 [info] esp8266: uhttpd-master started.

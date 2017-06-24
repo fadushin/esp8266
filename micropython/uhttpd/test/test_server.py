@@ -69,6 +69,8 @@ class TestAPIHandler:
                 return b''
             elif what_to_return == "something":
                 return b'something'
+            elif what_to_return == "html":
+                return "<html><body><h1>HTML</h1></body></html>"
             elif what_to_return == "bad_request_excetion":
                 raise uhttpd.BadRequestException("derp")
             elif what_to_return == "not_found_excetion":
