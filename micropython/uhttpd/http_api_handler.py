@@ -78,6 +78,9 @@ class Handler:
             elif type(response) is bytes:
                 data = response
                 content_type = "application/binary"
+            elif type(response) is str:
+                data = response.encode("UTF-8")
+                content_type = "text/html; charset=utf-8"
             else:
                 raise Exception("Response from API Handler is neither dict nor bytearray nor None")
             body = lambda stream: stream.awrite(data)

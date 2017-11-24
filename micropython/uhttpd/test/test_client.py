@@ -178,6 +178,10 @@ class HttpdTest(unittest.TestCase):
         self.verify_get('/api/test/not_found_excetion', expected_status=404, expected_content_type="text/html")
         self.verify_get('/api/test/forbidden_excetion', expected_status=403, expected_content_type="text/html")
 
+    def test_api_html(self):
+        self.verify_get('/api/test/html', expected_status=200, expected_content_type="text/html; charset=utf-8",
+            expected_body="<html><body><h1>HTML</h1></body></html>".encode("UTF-8"))
+
     def verify_get(
         self, context, body=None, additional_headers={},
         expected_status=None, expected_content_type=None, expected_body=None
