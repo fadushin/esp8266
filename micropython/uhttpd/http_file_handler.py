@@ -50,7 +50,7 @@ def listdir(path):
         ret = []
         for name, size, modified in uos.ilistdir(path):
             ret.append(name)
-        if ret == []:
+        if not ret:
             raise OSError()
         return ret
 
@@ -63,7 +63,7 @@ def exists(path):
 
 class Handler:
     def __init__(self, root_path='/www', block_size=1024):
-        if not exists(root_path) or not is_dir(root_path):
+        if not any([exists(root_path), is_dir(root_path)]):
             msg = "Root path {} is not an existing directory".format(root_path)
             raise Exception(msg)
         self._root_path = root_path
@@ -112,7 +112,8 @@ class Handler:
                 return response
             else:
                 logging.info("ACCESS {} {}".format(remote_addr, absolute_path))
-                prefix = http_request['prefix']
+                # this is not used
+                # prefix = http_request['prefix']
                 return self.create_dir_listing_response(absolute_path)
         else:
             logging.info("ACCESS {} {}".format(remote_addr, absolute_path))
@@ -161,12 +162,10 @@ class Handler:
         components = full_path.split('/')
         tmp = []
         for component in components:
-            if component == '':
+            if not component or component == '.':
                 pass
             elif component == "..":
                 tmp = tmp[:len(tmp) - 1]
-            elif component == '.':
-                pass
             else:
                 tmp.append(component)
         return "/{}".format('/'.join(tmp))
@@ -184,25 +183,29 @@ class Handler:
         return self.create_response(200, "text/html", length, body)
 
     def generate_dir_listing(self, absolute_path):
-        path = absolute_path[len(self._root_path):]
-        if not path:
-            path = '/'
-        data = "<html><body><header><em>uhttpd/{}</em><hr></header><h1>{}</h1><ul>".format(uhttpd.VERSION, path)
+        path = absolute_path[len(self._root_path):] or '/'
+        data = ("<html><body>"
+                "<header><em>uhttpd/{version}</em><hr></header>"
+                "<h1>{path}</h1><ul>").format(version=uhttpd.VERSION,
+                                              path=path)
         components = self.components(path)
-        components_len = len(components)
-        if components_len > 0:
-            data += "<li><a href=\"{}\">..</a></li>\n".format(self.to_path(components[:components_len-1]))
-        files = listdir(absolute_path)
-        for f in files:
+        if len(components):
+            data += ("<li>"
+                     "<a href=\"{}\">..</a>"
+                     "</li>\n").format(self.to_path(components[:-1]))
+        for file in listdir(absolute_path):
             tmp = components.copy()
-            tmp.append(f)
-            data += "<li><a href=\"{}\">{}</a></li>\n".format(self.to_path(tmp), f)
+            tmp.append(file)
+            data += ("<li>"
+                     "<a href=\"{}\">{}</a>"
+                     "</li>\n").format(self.to_path(tmp), file)
         data += "</ul></body></html>"
         data = data.encode('UTF-8')
         body = lambda stream: stream.awrite(data)
         return len(data), body
 
-    def to_path(self, components):
+    @staticmethod
+    def to_path(components):
         return "/{}".format("/".join(components))
 
     def components(self, path):
@@ -211,23 +214,16 @@ class Handler:
             f, path.strip('/').split('/')
         )
 
-    def filter(self, f, el):
-        ret = []
-        for e in el:
-            if f(e):
-                ret.append(e)
-        return ret
+    @staticmethod
+    def filter(f, el):
+        return [e for e in el if f(e)]
 
     @staticmethod
     def create_response(code, content_type, length, body):
-        return {
-            'code': code,
-            'headers': {
-                'content-type': content_type,
-                'content-length': length
-            },
-            'body': body
-        }
+        return {'code': code,
+                'headers': {'content-type': content_type,
+                            'content-length': length},
+                'body': body}
 
     @staticmethod
     def file_size(path):
