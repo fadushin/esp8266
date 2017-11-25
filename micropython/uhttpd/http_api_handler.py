@@ -41,15 +41,14 @@ class Handler:
         components = path_part.strip('/').split('/')
         prefix, handler, context = self.find_handler(components)
         if handler:
-            headers = http_request['headers']
             json_body = None
-            if all(['body' in http_request,
-                    headers.get('content-type') == "application/json"]):
+            headers = http_request['headers']
+            if 'body' in http_request and 'content-type' in headers and headers['content-type'] == "application/json":
                 try:
                     json_body = ujson.loads(http_request['body'])
                 except Exception as e:
                     raise uhttpd.BadRequestException("Failed to load JSON: {}".format(e))
-            verb = http_request['verb'].lower()
+            verb = http_request['verb']
             api_request = {
                 'prefix': prefix,
                 'context': context,
@@ -57,43 +56,45 @@ class Handler:
                 'body': json_body,
                 'http': http_request
             }
-            try:
-                response = getattr(handler, verb)(api_request)
-                # if verb == 'get':
-                #     response = handler.get
-                # elif verb == 'put':
-                #     response = handler.put(api_request)
-                # elif verb == 'post':
-                #     response = handler.post(api_request)
-                # elif verb == 'delete':
-                #     response = handler.delete(api_request)
-            except AttributeError:
+            if verb == 'get':
+                response = handler.get(api_request)
+            elif verb == 'put':
+                response = handler.put(api_request)
+            elif verb == 'post':
+                response = handler.post(api_request)
+            elif verb == 'delete':
+                response = handler.delete(api_request)
+            else:
                 # TODO add support for more verbs!
                 error_message = "Unsupported verb: {}".format(verb)
                 raise uhttpd.BadRequestException(error_message)
         else:
             error_message = "No handler found for components {}".format(components)
             raise uhttpd.NotFoundException(error_message)
-        response_headers = {}
         if response is not None:
             if type(response) is dict:
                 data = ujson.dumps(response).encode('UTF-8')
-                response_headers['content-type'] = "application/json"
+                content_type = "application/json"
             elif type(response) is bytes:
                 data = response
-                response_headers['content-type'] = "application/binary"
+                content_type = "application/binary"
             elif type(response) is str:
                 data = response.encode("UTF-8")
-                response_headers['content-type'] = "text/html; charset=utf-8"
+                content_type = "text/html; charset=utf-8"
             else:
                 raise Exception("Response from API Handler is neither dict nor bytearray nor None")
             body = lambda stream: stream.awrite(data)
         else:
-            body = None
-        response_headers['content-length'] = len(data)
-        ret = {'code': 200,
-               'headers': response_headers,
-               'body': body}
+            data = body = None
+        ret = {
+            'code': 200,
+            'headers': {
+                'content-length': len(data) if data else 0
+            },
+            'body': body
+        }
+        if data is not None:
+            ret['headers']['content-type'] = content_type
         return ret
 
     #
@@ -109,22 +110,20 @@ class Handler:
 
     @staticmethod
     def extract_query(path):
-        try:
-            path_, query = path.split("?")
-            if not query:
-                return path, None
-        except ValueError:
+        components = path.split("?")
+        if len(components) == 1:
+            return path, None
+        elif len(components) > 2:
             raise uhttpd.BadRequestException("Malformed path: {}".format(path))
+        path_part = components[0]
+        query_part = components[1]
+        qparam_components = query_part.split("&")
         query_params = {}
-        components = [component for component in query.split("&")
-                      if component.strip()]
-        for qparam_component in components:
-            try:
-                parameter, value = qparam_component.split("=")
-                if not parameter:
-                    raise ValueError
-            except ValueError:
-                message = "Invalid query parameter: {}".format(qparam_component)
-                raise uhttpd.BadRequestException(message)
-            query_params[parameter] = value
-        return path_, query_params
+        for qparam_component in qparam_components:
+            if qparam_component.strip() == '':
+                continue
+            qparam = qparam_component.split("=")
+            if len(qparam) != 2 or not qparam[0]:
+                raise uhttpd.BadRequestException("Invalid query parameter: {}".format(qparam_component))
+            query_params[qparam[0]] = qparam[1]
+        return path_part, query_params

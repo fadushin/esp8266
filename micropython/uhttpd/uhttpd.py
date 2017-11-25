@@ -49,17 +49,9 @@ def get_relative_path(http_request):
     return path[len(prefix):]
 
 
-HTTP_CODES = {200: 'OK',
-              400: 'Bad Request',
-              401: 'Unauthorized',
-              403: 'Forbidden',
-              404: 'Not Found',
-              500: 'Internal Server Error'}
-
 class Server:
-    def __init__(self, handlers, config=None):
+    def __init__(self, handlers, config={}):
         self._handlers = handlers
-        config = {} if config is None else config
         self._config = self.update(self.default_config(), config)
         self._tcp_server = TCPServer(
             bind_addr=self._config['bind_addr'],
@@ -220,16 +212,15 @@ class Server:
     def is_authorized(self, authorization):
         import ubinascii
         try:
-            auth_type, auth_data = authorization.split()
-            if auth_type.lower() == "basic":
-                user, password = ubinascii.a2b_base64(auth_data.strip().encode()
-                                                      ).decode().split(':')
-                auth_result = user == self._config['user'] and \
-                              password == self._config['password']
-                return auth_result, user
+            tmp = authorization.split()
+            if tmp[0].lower() == "basic":
+                str = ubinascii.a2b_base64(tmp[1].strip().encode()).decode()
+                ra = str.split(':')
+                auth_result = ra[0] == self._config['user'] and ra[1] == self._config['password']
+                return auth_result, ra[0]
             else:
                 raise BadRequestException(
-                    "Unsupported authorization method: {}".format(auth_type))
+                    "Unsupported authorization method: {}".format(tmp[0]))
         except Exception as e:
             raise BadRequestException(e)
 
@@ -243,7 +234,20 @@ class Server:
 
     @staticmethod
     def lookup_code(code):
-        return HTTP_CODES.get(code, "Unknown")
+        if code == 200:
+            return "OK"
+        elif code == 400:
+            return "Bad Request"
+        elif code == 401:
+            return "Unauthorized"
+        elif code == 403:
+            return "Forbidden"
+        elif code == 404:
+            return "Not Found"
+        elif code == 500:
+            return "Internal Server Error"
+        else:
+            return "Unknown"
 
     @staticmethod
     def format_headers(headers):
@@ -271,9 +275,10 @@ class Server:
         #
         # Write the body, if it's present
         #
-        body = response.get('body')
-        if body:
-            yield from body(stream)
+        if 'body' in response:
+            body = response['body']
+            if body:
+                yield from body(stream)
 
     def unauthorized_error(self, writer):
         headers = {
@@ -330,14 +335,14 @@ class Server:
             VERSION).encode('UTF-8')
         # message data in ef will go here
         data2 = '</body></html>'.encode('UTF-8')
-        body = lambda writer: (yield from Server.write_html(writer,
-                                                            data1,
-                                                            ef,
-                                                            data2))
-        return {'code': code,
-                'headers': Server.update({'content-type': "text/html"},
-                                         headers),
-                'body': body}
+        body = lambda writer: (yield from Server.write_html(writer, data1, ef, data2))
+        return {
+            'code': code,
+            'headers': Server.update({
+                'content-type': "text/html",
+            }, headers),
+            'body': body
+        }
 
     @staticmethod
     def write_html(writer, data1, ef, data2):
