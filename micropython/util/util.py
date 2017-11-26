@@ -73,18 +73,18 @@ def ush():
 
 def wc():
     import uhttpd
-    import http_file_handler
-    import http_api_handler
+    import uhttpd.file_handler
+    import uhttpd.api_handler
     import api
 
-    api_handler = http_api_handler.Handler([
+    api_handler = uhttpd.api_handler.Handler([
         #([], api.APIHandler())
         (['system'], api.SystemAPIHandler()),
         (['memory'], api.MemoryAPIHandler()),
         (['flash'], api.FlashAPIHandler()),
         (['network'], api.NetworkAPIHandler())
     ])
-    file_handler = http_file_handler.Handler(block_size=256)
+    file_handler = uhttpd.file_handler.Handler(block_size=256)
     server = uhttpd.Server([
         ('/api', api_handler),
         ('/', file_handler)
