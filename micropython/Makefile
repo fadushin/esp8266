@@ -30,9 +30,9 @@ LOGGING_MODULES= \
 	logging/syslog_sink.py
 
 UHTTPD_MODULES=\
-	uhttpd/uhttpd.py \
-	uhttpd/http_file_handler.py \
-	uhttpd/http_api_handler.py \
+	uhttpd/uhttpd/__init__.py \
+	uhttpd/uhttpd/file_handler.py \
+	uhttpd/uhttpd/api_handler.py \
 	uhttpd/demo/stats_api.py \
 	uhttpd/demo/my_api.py
 

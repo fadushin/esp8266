@@ -94,10 +94,10 @@ server = None
 def run(root_path='/test', port=80, backlog=10):
     print("Starting test server ...")
     import uhttpd
-    import http_file_handler
-    file_handler = http_file_handler.Handler(root_path=root_path)
-    import http_api_handler
-    api_handler = http_api_handler.Handler(
+    import uhttpd.file_handler
+    file_handler = uhttpd.file_handler.Handler(root_path=root_path)
+    import uhttpd.api_handler
+    api_handler = uhttpd.api_handler.Handler(
         [(['test'], TestAPIHandler())]
     )
     global server
