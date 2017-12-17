@@ -1,4 +1,8 @@
 import esp
 esp.osdebug(None)
 
-from util import *
+##
+## These make command-line hacking easier
+## remove as part of production
+##
+from core.cmd import *
