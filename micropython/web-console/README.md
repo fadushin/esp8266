@@ -46,17 +46,17 @@ You may now run the HTTP server, as follows:
 
     def web_console():
         import uhttpd
-        import http_file_handler
-        import http_api_handler
+        import uhttpd.file_handler
+        import uhttpd.api_handler
         import api
 
-        api_handler = http_api_handler.Handler([
+        api_handler = uhttpd.api_handler.Handler([
             (['system'], api.SystemAPIHandler()),
             (['memory'], api.MemoryAPIHandler()),
             (['flash'], api.FlashAPIHandler()),
             (['network'], api.NetworkAPIHandler())
         ])
-        file_handler = http_file_handler.Handler()
+        file_handler = uhttpd.file_handler.Handler()
         server = uhttpd.Server([
             ('/api', api_handler),
             ('/', file_handler)
