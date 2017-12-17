@@ -9,9 +9,11 @@ fi
 IP_ADDRESS=$1
 shift
 
-FILES=$(ls *.py)
+
 if [ ${NARGS} -gt 1 ] ; then
     FILES=$@
+else
+    FILES=$(ls *.py)
 fi
 
 if [ ! $(which webrepl_cli.py) ] ; then
