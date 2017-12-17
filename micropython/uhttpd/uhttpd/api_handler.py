@@ -72,17 +72,19 @@ class Handler:
             error_message = "No handler found for components {}".format(components)
             raise uhttpd.NotFoundException(error_message)
         if response is not None:
-            if type(response) is dict:
+            response_type = type(response)
+            if response_type is dict:
                 data = ujson.dumps(response).encode('UTF-8')
                 content_type = "application/json"
-            elif type(response) is bytes:
+            elif response_type is bytes:
                 data = response
                 content_type = "application/binary"
-            elif type(response) is str:
+            elif response_type is str:
                 data = response.encode("UTF-8")
                 content_type = "text/html; charset=utf-8"
-            else:
-                raise Exception("Response from API Handler is neither dict nor bytearray nor None")
+            elif response_type is int or response_type is float: 
+                data = str(response)
+                content_type = "text/plain"
             body = lambda stream: stream.awrite(data)
         else:
             data = body = None
