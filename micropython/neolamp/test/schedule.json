@@ -1,0 +1,41 @@
+[{
+    "time": {
+        "hour": 10,
+        "minute": 15,
+        "second": 0,
+        "dow": [1,2,3,4,5]
+    },
+    "color_name": "black"
+},{
+    "time": {
+        "hour": 10,
+        "minute": 20,
+        "second": 0,
+        "dow": [1,2,3,4,5]
+    },
+    "color_name": "mellow_yellow"
+},{
+    "time": {
+        "hour": 11,
+        "minute": 0,
+        "second": 0,
+        "dow": [1,2,3,4,5]
+    },
+    "color_name": "purple_haze"
+},{
+    "time": {
+        "hour": 11,
+        "minute": 15,
+        "second": 0,
+        "dow": [1,2,3,4,5]
+    },
+    "color_name": "red_alert"
+},{
+    "time": {
+        "hour": 11,
+        "minute": 30,
+        "second": 0,
+        "dow": [1,2,3,4,5]
+    },
+    "color_name": "black"
+}]

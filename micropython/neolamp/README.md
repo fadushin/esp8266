@@ -1,0 +1,2 @@
+
+The `neolamp` project provides software for the ESP8266 that drives a set of NeoPixel LEDs to function as a lamp, for nightlight or other applications.  The software is designed to be installed and run on an ESP8266 and driven via a web-interface.  Users may control the 

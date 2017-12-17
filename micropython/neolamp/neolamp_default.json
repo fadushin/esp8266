@@ -1,0 +1,13 @@
+{
+    "pin": 2,
+    "num_pixels": 9,
+    "mode": "off",
+    "scheduler": {
+        "verbose": false,    
+        "schedules": []
+    },
+    "neolamp": {
+        "verbose": false,    
+        "color_name": "purple_haze"
+    }
+}

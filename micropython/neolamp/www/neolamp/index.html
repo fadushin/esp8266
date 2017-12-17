@@ -1,0 +1,108 @@
+<!-- 
+----------------------------------------------------------------------------
+"THE BEER-WARE LICENSE" (Revision 42):
+<fred@dushin.net> wrote this file.  You are hereby granted permission to
+copy, modify, or mutilate this file without restriction.  If you create a
+work derived from this file, you may optionally include a copy of this notice,
+for which I would be most grateful, but you are not required to do so.
+If we meet some day, and you think this stuff is worth it, you can buy me a
+beer in return.   Fred Dushin
+----------------------------------------------------------------------------
+-->
+<!DOCTYPE html>
+<html>
+    <style>
+    #slidecontainer {
+        width: 100%;
+    }
+
+    .slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 25px;
+        background: #d3d3d3;
+        outline: none;
+        opacity: 0.7;
+        -webkit-transition: .2s;
+        transition: opacity .2s;
+    }
+
+    .slider:hover {
+        opacity: 1;
+    }
+
+    .slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 25px;
+        height: 25px;
+        background: #4CAF50;
+        cursor: pointer;
+    }
+
+    .slider::-moz-range-thumb {
+        width: 25px;
+        height: 25px;
+        background: #4CAF50;
+        cursor: pointer;
+    }
+    </style>
+    <body>
+        <h1>NeoLamp</h1>
+        <div id="red-slide-container">
+          <input type="range" min="0" max="255" value="50" class="slider" id="red-slider">
+          <p>Red Value: <span id="red-value-label"></span></p>
+        </div>
+        <div id="green-slide-container">
+          <input type="range" min="0" max="255" value="50" class="slider" id="green-slider">
+          <p>Green Value: <span id="green-value-label"></span></p>
+        </div>
+        <div id="blue-slide-container">
+          <input type="range" min="0" max="255" value="50" class="slider" id="blue-slider">
+          <p>Blue Value: <span id="blue-value-label"></span></p>
+        </div>
+        
+        <div class="w3-col l4 m12" style="text-align:center;">
+            <h3>Pick a Color:</h3>
+          <div id="html5DIV">
+            <input type="color" id="html5colorpicker" onchange="clickColor(0, -1, -1, 5)" value="#ff0000" style="width:85%;">
+          </div>
+        </div>
+
+        <script>
+            var red_slider = document.getElementById("red-slider");
+            var red_value_label = document.getElementById("red-value-label");
+            red_value_label.innerHTML = red_slider.value;
+            var green_slider = document.getElementById("green-slider");
+            var green_value_label = document.getElementById("green-value-label");
+            green_value_label.innerHTML = green_slider.value;
+            var blue_slider = document.getElementById("blue-slider");
+            var blue_value_label = document.getElementById("blue-value-label");
+            blue_value_label.innerHTML = blue_slider.value;
+            red_slider.oninput = function() {
+                var v = this.value;
+                red_value_label.innerHTML = v;
+                var xhttp = new XMLHttpRequest();
+                xhttp.open("POST", "api/neolamp?r=" + red_slider.value + "&g=" + green_slider.value + "&b=" + blue_slider.value, true);
+                xhttp.send();
+            }
+            green_slider.oninput = function() {
+                var v = this.value;
+                green_value_label.innerHTML = v;
+                var xhttp = new XMLHttpRequest();
+                xhttp.open("POST", "api/neolamp?r=" + red_slider.value + "&g=" + green_slider.value + "&b=" + blue_slider.value, true);
+                xhttp.send();
+            }
+            blue_slider.oninput = function() {
+                var v = this.value;
+                blue_value_label.innerHTML = v;
+                var xhttp = new XMLHttpRequest();
+                xhttp.open("POST", "api/neolamp?r=" + red_slider.value + "&g=" + green_slider.value + "&b=" + blue_slider.value, true);
+                xhttp.send();
+            }
+        </script>
+            
+        
+    </body>
+</html>
+
