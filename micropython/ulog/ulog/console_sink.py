@@ -24,15 +24,27 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+import sys
+
 class Sink :
     
     def __init__(self, config) :
         pass
 
     def log(self, message) :
-        print("{} [{}] {}: {}".format(
-            message['datetime'], 
-            message['level'], 
-            message['name'], 
-            message['message'])
-        )
+        try :
+            print("{} [{}] {}: {}".format(
+                message['datetime'], 
+                message['level'], 
+                message['name'], 
+                message['message'])
+            )
+        except Exception as e :
+            print("Error printing message:")
+            sys.print_exception(e)
+            print("begin message ==>")
+            print(message['datetime'])
+            print(message['level'])
+            print(message['name'])
+            print(message['message'])
+            print("<=== end message")

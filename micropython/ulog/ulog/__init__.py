@@ -93,7 +93,12 @@ class Log :
     
     def log(self, level, format_str, *args) :
         if level in self._levels :
-            message = self.create(level, format_str, *args)
+            try :
+                message = self.create(level, format_str, *args)
+            except Exception :
+                print("WARNING: Error formatting log message.  Log will be delivered unformatted.")
+                sys.print_exception(e)
+                message = (level, format_str, args)
             for name, sink in self._sinks.items() :
                 self.do_log(sink, message)
     
