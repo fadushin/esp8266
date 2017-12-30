@@ -25,40 +25,50 @@
 #
 import uasyncio
 import logging
-import logging
 import sys
+import core.util
 
-STATE_INIT=b'0'
-STATE_RUNNING=b'1'
-STATE_STOPPING=b'2'
-STATE_STOPPED=b'3'
 
 
 class TaskBase :
 
+    INIT=b'0'
+    RUNNING=b'1'
+    STOPPING=b'2'
+    STOPPED=b'3'
+
     def __init__(self, sleep_ms, verbose=False) :
         self.sleep_ms = sleep_ms
         self._verbose = verbose
-        self.state = STATE_INIT
+        self.state = TaskBase.INIT
         self.disabled = False
+        self.num_calls = 0
+        self.num_failures = 0
+        self.last_retry_ms = None
 
     def register(self) :
         loop = uasyncio.get_event_loop()
         loop.create_task(self.loop())
-        self.state = STATE_RUNNING
+        self.state = TaskBase.RUNNING
         return self
 
     def isRunning(self) :
-        return self.state == STATE_RUNNING
+        return self.state == TaskBase.RUNNING
 
     def cancel(self) :
-        self.state = STATE_STOPPING
+        self.state = TaskBase.STOPPING
     
     def disable(self) :
         self.disabled = True
     
     def enable(self) :
         self.disabled = False
+
+    def stats(self) :
+        return {
+            'num_calls': self.num_calls,
+            'num_failures': self.num_failures
+        }
 
     def perform(self) :
         pass
@@ -68,19 +78,24 @@ class TaskBase :
             logging.info("TaskBase: loop starting.")
         while self.isRunning() :
             if not self.disabled :
-                result = None
                 try :
+                    self.num_calls += 1
                     result = self.perform()
+                    if not result:
+                        return
+                    self.last_retry_ms = None
                 except Exception as e :
+                    if not self.last_retry_ms :
+                        self.last_retry_ms = 500
+                    else :
+                        self.last_retry_ms = min(self.sleep_ms, self.last_retry_ms * 2)
+                    self.num_failures += 1
                     logging.info("An error occurred performing {}: {}".format(self, e))
                     sys.print_exception(e)
-                if not result:
-                    break
-                else :
-                    await uasyncio.sleep_ms(self.sleep_ms)
+                await uasyncio.sleep_ms(self.sleep_ms if not self.last_retry_ms else self.last_retry_ms)
             else :
                 await uasyncio.sleep_ms(914)
-        self.state = STATE_STOPPED
+        self.state = TaskBase.STOPPED
         if self._verbose :
             logging.info("TaskBase: loop terminated.")
         return
@@ -91,10 +106,38 @@ class Gcd(TaskBase) :
     def __init__(self, sleep_ms=5*1000, verbose=False) :
         TaskBase.__init__(self, sleep_ms)
         self.verbose = verbose
+        self.mem_free = 0
+        self.mem_alloc = 0
+        self.min_collected = 2**32
+        self.max_collected = 0
+        self.sum_collected = 0
+        self.num_collections = 0
+
+    def stats(self) :
+        return core.util.update_dict(
+            TaskBase.stats(self), {
+                'mem_free': self.mem_free,
+                'mem_alloc': self.mem_alloc,
+                'min_collected': self.min_collected,
+                'max_collected': self.max_collected,
+                'sum_collected': self.sum_collected,
+                'num_collections': self.num_collections
+            }
+        )
 
     def perform(self) :
         import gc
+        mem_free_before = gc.mem_free()
         gc.collect()
+        self.mem_free = gc.mem_free()
+        self.mem_alloc = gc.mem_alloc()
+        mem_collected = self.mem_free - mem_free_before
+        if mem_collected < self.min_collected :
+            self.min_collected = mem_collected
+        if self.max_collected < mem_collected :
+            self.max_collected = mem_collected
+        self.sum_collected += mem_collected
+        self.num_collections += 1
         return True
 
 
@@ -103,17 +146,27 @@ class Ntpd(TaskBase) :
     def __init__(self, sleep_ms=15*60*1000, verbose=True) :
         TaskBase.__init__(self, sleep_ms)
         self.verbose = verbose
+        self.min_skew = 2**31 - 1
+        self.max_skew = -self.min_skew
+
+    def stats(self) :
+        return core.util.update_dict(
+            TaskBase.stats(self), {
+                'min_skew': self.min_skew,
+                'max_skew': self.max_skew
+            }
+        )
 
     def perform(self) :
         import ntptime
         import core.util
         import utime
         old_secs = utime.time()
-        try :
-            ntptime.settime()
-            new_secs = utime.time()
-            if self.verbose :
-                logging.info("ntpd: time set to {} UTC (skew: {} secs)".format(core.util.secs_to_string(new_secs), new_secs - old_secs))
-        except BaseException as e :
-            logging.info("ntpd: caught excption setting time: {}".format(e))
+        ntptime.settime()
+        new_secs = utime.time()
+        skew = new_secs - old_secs
+        self.min_skew = min(skew, self.min_skew)
+        self.max_skew = max(skew, self.max_skew)
+        if self.verbose :
+            logging.info("ntpd: time set to {} UTC (skew: {} secs)".format(core.util.secs_to_string(new_secs), skew))
         return True

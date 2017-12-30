@@ -25,38 +25,41 @@
 #
 
 def dump_json(f, obj) :
+    return traverse_json(lambda s : f.write(s), obj)
+
+def traverse_json(ef, obj) :
     obj_type = type(obj)
     if obj_type is dict :
-        f.write('{')
+        ef('{')
         i = 0
         for (k, v) in obj.items() :
             if i > 0 :
-                f.write(',')
-            dump_enquoted(f, k)
-            f.write(": ")
-            dump_json(f, v)
+                ef(',')
+            traverse_enquoted(ef, k)
+            ef(": ")
+            traverse_json(ef, v)
             i = i + 1
-        f.write('}')
+        ef('}')
     elif obj_type is list :
-        f.write('[')
+        ef('[')
         i = 0
         for e in obj :
             if i > 0 :
-                f.write(',')
-            dump_json(f, e)
+                ef(',')
+            traverse_json(ef, e)
             i = i + 1
-        f.write(']')
+        ef(']')
     elif obj_type is bool :
-        f.write("true" if obj else "false")
+        ef("true" if obj else "false")
     elif obj_type is str :
-        dump_enquoted(f, obj)
+        traverse_enquoted(ef, obj)
     else :
-        f.write(str(obj))
+        ef(str(obj))
 
-def dump_enquoted(f, s) :
-    f.write('"')
-    f.write(s) # TODO escape?
-    f.write('"')
+def traverse_enquoted(ef, s) :
+    ef('"')
+    ef(s) # TODO escape?
+    ef('"')
 
 def exists(path) :
     import os
@@ -76,8 +79,7 @@ def save_json(path, obj) :
 def load_json(path) :
     import ujson
     with open(path, 'r') as f :
-        s = f.read()
-        return ujson.loads(s)
+        return ujson.load(f)
 
 def random_int(lb=0, ub=4924967296) :
     import ustruct
@@ -90,8 +92,8 @@ def reboot() :
     machine.reset()
 
 def localtime_to_string(localtime, timezone="Z") :
-    (year, month, day, hour, minute, second, millis, _tzinfo) = localtime
-    return "%d-%02d-%02dT%02d:%02d:%02d.%03d%s" % (year, month, day, hour, minute, second, millis, timezone)
+    (year, month, day, hour, minute, second, _weekday, _tzinfo) = localtime
+    return "%d-%02d-%02dT%02d:%02d:%02d%s" % (year, month, day, hour, minute, second, timezone)
 
 def secs_to_string(secs=None):
     import core
@@ -130,8 +132,6 @@ def hexdump(src, length=16, sep='.'):
 		lines.append("%08x:  %-*s  |%s|\n" % (c, length*3, hex, printable))
 	return ''.join(lines)
 
-def min(x, y) :
-    return x if x < y else y
-
-def max(x, y) :
-    return x if x > y else y
+def update_dict(d1, d2) :
+    d1.update(d2)
+    return d1

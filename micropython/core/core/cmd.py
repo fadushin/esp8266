@@ -143,7 +143,7 @@ def date(secs=False):
     if secs:
         print(utime.mktime(localtime))
     else:
-        print(core.localtime_to_string(localtime))
+        print(core.util.localtime_to_string(localtime))
 
 def ntpupdate():
     import ntptime
