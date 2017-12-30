@@ -28,14 +28,17 @@ import uhttpd
 
 class Handler :
     
-    def __init__(self, controller):
+    def __init__(self, controller, verbose=False):
         self.controller = controller
+        self.verbose = verbose
 
     def get(self, api_request):
         context = api_request['context']
         if len(context) > 0 :
             if context[0] == 'config' :
-                return self.get_path(self.controller.config, context[1:])
+                return Handler.get_path(self.controller.config, context[1:])
+            if context[0] == 'stats' :
+                return self.controller.get_stats()
         else :
             return self.get_color()
                 
@@ -52,29 +55,56 @@ class Handler :
             "data": data
         }
         
-    def get_path(self, tree, path) :
+    @staticmethod
+    def get_path(tree, path) :
         for c in path :
             if c in tree :
                 tree = tree[c]
             else :
                 raise uhttpd.NotFoundException("Invalid path: {}; '{}' not found.".format(path, c))
-        return tree
-
+        return Handler.serialize(tree)
+    
+    @staticmethod
+    def serialize(node) :
+        node_type = type(node)
+        if node_type is dict :
+            return Handler.list_keys(node)
+        else :
+            return node
+    
+    @staticmethod
+    def list_keys(node) :
+        ret = []
+        for key in node.keys() :
+            ret.append(key)
+        return ret
 
     def post(self, api_request):
+        if self.verbose :
+            logging.info('post: api_request={}', api_request)
         context = api_request['context']
         if len(context) > 0 :
             query_params = api_request['query_params']
             operator = context[0]
             if operator == 'mode' :
                 self.controller.set_mode(query_params['mode'])
-            elif operator == 'neolamp' :
+            elif operator == 'np' :
+                pin = None
+                num_pixels = None
+                if 'pin' in query_params :
+                    pin = query_params['pin']
+                if 'num_pixels' in query_params :
+                    num_pixels = query_params['num_pixels']
+                self.controller.set_np(pin=pin, num_pixels=num_pixels)
+            elif operator == 'lamp' :
                 self.controller.set_color_name(query_params['color_name'])
-            elif operator == 'schedules' :
-                self.controller.set_schedules(api_request['body'])
-            elif operator == 'set_colorspec' :
+            elif operator == 'schedule' :
+                if 'name' not in query_params :
+                    raise uhttpd.BadRequestException("Expected name in query_params")
+                self.controller.update_schedule(query_params['name'], api_request['body'])
+            elif operator == 'colorspec' :
                 self.controller.set_colorspec(api_request['body'])
-            elif operator == 'set_color' :
+            elif operator == 'color' :
                 self.controller.set_color((
                     int(query_params['r']),
                     int(query_params['g']),
@@ -88,3 +118,17 @@ class Handler :
                 raise uhttpd.BadRequestException("Bad post request: Unknown operator: {}".format(operator))
         else :
             raise uhttpd.BadRequestException("Bad post request: Missing operator in context")
+
+    def delete(self, api_request):
+        context = api_request['context']
+        if len(context) > 0 :
+            query_params = api_request['query_params']
+            operator = context[0]
+            if operator == 'schedule' :
+                if 'name' not in query_params :
+                    raise uhttpd.BadRequestException("Expected name in query_params")
+                self.controller.delete_schedule(query_params['name'])
+            else :
+                raise uhttpd.BadRequestException("Bad delete request: Unknown operator: {}".format(operator))
+        else :
+            raise uhttpd.BadRequestException("Bad delete request: Missing operator in context")

@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
-IP_ADDR="192.168.1.200"
+EXE_DIR=$(dirname $0)
+. ${EXE_DIR}/env.sh
 
-curl -X POST "http://${IP_ADDR}/api/neolamp/neolamp?color_name=mellow_yellow"
-curl -X POST "http://${IP_ADDR}/api/neolamp/mode?mode=neolamp"
+python3 test.py --host=${ESP_IP_ADDRESS} $@
