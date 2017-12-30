@@ -71,33 +71,50 @@ class Handler:
         else:
             error_message = "No handler found for components {}".format(components)
             raise uhttpd.NotFoundException(error_message)
+        ##
+        ## prepare response
+        ##
         if response is not None:
             response_type = type(response)
-            if response_type is dict:
+            if response_type is dict or response_type is list:
                 data = ujson.dumps(response).encode('UTF-8')
+                body = lambda stream : stream.awrite(data)
                 content_type = "application/json"
+                content_length = len(data)
             elif response_type is bytes:
                 data = response
+                body = lambda stream : stream.awrite(data)
                 content_type = "application/binary"
+                content_length = len(data)
             elif response_type is str:
                 data = response.encode("UTF-8")
+                body = lambda stream : stream.awrite(data)
                 content_type = "text/html; charset=utf-8"
+                content_length = len(data)
             elif response_type is int or response_type is float: 
                 data = str(response)
+                body = lambda stream : stream.awrite(data)
                 content_type = "text/plain"
-            body = lambda stream: stream.awrite(data)
+                content_length = len(data)
+            else :
+                data = str(response)
+                body = lambda stream : stream.awrite(data)
+                content_type = "text/plain"
+                content_length = len(data)
         else:
-            data = body = None
-        ret = {
+            body = None
+            content_type = None
+            content_length = None
+        headers = {}
+        if content_length :
+            headers.update({'content-length': content_length})
+        if content_type:
+            headers.update({'content-type': content_type})
+        return {
             'code': 200,
-            'headers': {
-                'content-length': len(data) if data else 0
-            },
+            'headers': headers,
             'body': body
         }
-        if data is not None:
-            ret['headers']['content-type'] = content_type
-        return ret
 
     #
     # Internal operations

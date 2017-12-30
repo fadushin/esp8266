@@ -15,7 +15,9 @@ By itself, the `uhttpd` module is just a TCP server and framework for adding han
 
 This package includes a Request Handler for servicing files on the micropython file system (e.g., HTML, Javascript, CSS, etc), as well as a Request Handler for managing REST-ful API calls, essential components in any modern web-based application.  The API Request Handler in turn supports the addition of application-specific API Handlers, described in more detail below.
 
-Once started, the `uhttpd` server runs in the background, so that the ESP8266 can do other tasks.  When the server accepts a request, however, the ESP8266 will block for the period of time it takes to process the request, i.e., read and parse the request sent from the client, dispatch the parsed request to the designated handler to get a response, and send the response back to the client.  Ordinarily, this should only take a few milliseconds, but applications may vary in their request processing time.
+The `uhttpd` server makes use of the excellent [micropython-lib](https://github.com/micropython/micropython-lib) `uasyncio` library.  Once started, the `uhttpd` server makes a blocking call that runs in the foreground.  However, under the hood, the `uhttpd` server is just an asyncio task, which, with proper care, can be used in tandem with other tasks that run cooperatively on the the device.
+
+When the server accepts a request, the ESP8266 will get scheduled to execute for the period of time it takes to process the request, i.e., read and parse the request sent from the client, dispatch the parsed request to the designated handler to get a response, and send the response back to the client.  Ordinarily, this should only take a few milliseconds, but applications may vary in their request processing time.
 
 TCP/IP connections between clients and the `uhttpd` server endure for the duration of a single request.  Once the client opens a connection to the server, the server will dispatch the request to an appropriate handler and wait for the response from the handler.  It will then send the response back to the client on the open connection, and then close the connection to the client.
  
@@ -34,11 +36,11 @@ While the `uhttpd` code is intended to be a robust HTTP server for many needs, t
 The `uhttpd` framework and server is comprised the following python package:
 
 * `uhttpd/`
-	* `uhttpd.py` -- provides HTTP server and framework
+	* `__init__.py` -- provides HTTP server and framework
 	* `file_handler.py` -- a file handler for the `uhttpd` server
 	* `api_handler.py` -- a handler for servicing REST-ful APIs
 
-This package relies on the `logging` facility, defined in [logging](https://github.com/micropython/micropython-lib/tree/master/logging).
+This package relies on the `logging` facility, defined in [logging](https://github.com/micropython/micropython-lib/tree/master/logging).  However, for applictions that prefer slightly more robus logging, you can substitute the [ulog](../ulog) library, which has a compatible API for simple `info` and `debug` log messages.
 
 There is currently no `upip` support for this package.
 

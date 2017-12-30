@@ -71,13 +71,20 @@ class TestAPIHandler:
                 return b'something'
             elif what_to_return == "html":
                 return "<html><body><h1>HTML</h1></body></html>"
+            elif what_to_return == "json":
+                return {'some': [{'j': 1, 's': [], 'o': "str", 'n': {"дружище": "バディ"}}]}
+            elif what_to_return == "int":
+                return 1342
+            elif what_to_return == "float":
+                return 3.14159
             elif what_to_return == "bad_request_excetion":
                 raise uhttpd.BadRequestException("derp")
             elif what_to_return == "not_found_excetion":
                 raise uhttpd.NotFoundException("what you were looking for")
             elif what_to_return == "forbidden_excetion":
                 raise uhttpd.ForbiddenException("tsktsk")
-        return {'action': 'get'}
+        else :
+            return {'action': 'get'}
 
     def put(self, api_request):
         return {'action': 'put'}

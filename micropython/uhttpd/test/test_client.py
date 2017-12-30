@@ -153,7 +153,6 @@ class HttpdTest(unittest.TestCase):
 
     def test_api_actions(self):
         self.verify_get('/api/test', expected_status=200, expected_content_type='application/json', expected_body=b'{"action": "get"}')
-        self.verify_get('/api/test/foo', expected_status=200, expected_content_type='application/json', expected_body=b'{"action": "get"}')
         self.verify_put('/api/test', expected_status=200, expected_content_type='application/json', expected_body=b'{"action": "put"}')
         self.verify_post('/api/test', expected_status=200, expected_content_type='application/json', expected_body=b'{"action": "post"}')
         self.verify_delete('/api/test', expected_status=200, expected_content_type='application/json', expected_body=b'{"action": "delete"}')
@@ -173,6 +172,9 @@ class HttpdTest(unittest.TestCase):
         self.verify_get('/api/test/nothing', expected_status=200, expected_content_type=None, expected_body=None)
         self.verify_get('/api/test/empty', expected_status=200, expected_content_type="application/binary", expected_body=b'')
         self.verify_get('/api/test/something', expected_status=200, expected_content_type="application/binary", expected_body=b'something')
+        self.verify_get('/api/test/json', expected_status=200, expected_content_type="application/json", expected_body=None) # TODO Fix compare "{\"some\": [{\"j\": 1, \"s\": [], \"o\": \"str\", \"n\": {\"дружище\": \"バディ\"}}]}".encode('utf-8'))
+        self.verify_get('/api/test/int', expected_status=200, expected_content_type="text/plain", expected_body=b'1342')
+        self.verify_get('/api/test/float', expected_status=200, expected_content_type="text/plain", expected_body=b'3.14159')
 
     def test_api_exception(self):
         self.verify_get('/api/test/bad_request_excetion', expected_status=400, expected_content_type="text/html")
