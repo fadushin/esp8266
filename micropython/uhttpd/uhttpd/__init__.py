@@ -269,7 +269,7 @@ class Server:
         yield from stream.awrite("{}\r\n{}\r\n".format(
             Server.format_heading(response['code']),
             Server.format_headers(Server.update(
-                response['headers'], {'Server': Server.server_name()}
+                response['headers'], {'Server': Server.server_name(),'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'}
             ))
         ).encode('UTF-8'))
         #
