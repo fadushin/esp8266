@@ -36,33 +36,23 @@ class Handler :
         context = api_request['context']
         if len(context) > 0 :
             if context[0] == 'config' :
-                return Handler.get_path(self.controller.config, context[1:])
+                query_params = api_request['query_params']
+                return Handler.get_path(self.controller.config, context[1:], 'all' in query_params and query_params['all'] == 'true')
             if context[0] == 'stats' :
                 return self.controller.get_stats()
+            if context[0] == 'color' :
+                return self.controller.get_color()
         else :
-            return self.get_color()
-                
-    def get_color(self):
-        data = []
-        for i in range(self.controller.np.n) :
-            data.append({
-                "r": self.controller.np[i][0],
-                "g": self.controller.np[i][1],
-                "b": self.controller.np[i][2]
-            })
-        return {
-            "n": len(data),
-            "data": data
-        }
-        
+            raise uhttpd.BadRequestException("Bad get request: Missing operator in context")
+
     @staticmethod
-    def get_path(tree, path) :
+    def get_path(tree, path, all=False) :
         for c in path :
             if c in tree :
                 tree = tree[c]
             else :
                 raise uhttpd.NotFoundException("Invalid path: {}; '{}' not found.".format(path, c))
-        return Handler.serialize(tree)
+        return Handler.serialize(tree) if not all else tree
     
     @staticmethod
     def serialize(node) :
@@ -97,13 +87,17 @@ class Handler :
                     num_pixels = query_params['num_pixels']
                 self.controller.set_np(pin=pin, num_pixels=num_pixels)
             elif operator == 'lamp' :
+                if 'color_name' not in query_params :
+                    raise uhttpd.BadRequestException("Expected name in query_params")
                 self.controller.set_color_name(query_params['color_name'])
             elif operator == 'schedule' :
                 if 'name' not in query_params :
                     raise uhttpd.BadRequestException("Expected name in query_params")
                 self.controller.update_schedule(query_params['name'], api_request['body'])
             elif operator == 'colorspec' :
-                self.controller.set_colorspec(api_request['body'])
+                if 'name' not in query_params :
+                    raise uhttpd.BadRequestException("Expected name in query_params")
+                self.controller.set_colorspec(query_params['name'], api_request['body'])
             elif operator == 'color' :
                 self.controller.set_color((
                     int(query_params['r']),
@@ -128,6 +122,10 @@ class Handler :
                 if 'name' not in query_params :
                     raise uhttpd.BadRequestException("Expected name in query_params")
                 self.controller.delete_schedule(query_params['name'])
+            elif operator == 'colorspec' :
+                if 'name' not in query_params :
+                    raise uhttpd.BadRequestException("Expected name in query_params")
+                self.controller.delete_colorspec(query_params['name'])
             else :
                 raise uhttpd.BadRequestException("Bad delete request: Unknown operator: {}".format(operator))
         else :

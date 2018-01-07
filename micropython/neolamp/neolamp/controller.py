@@ -76,12 +76,10 @@ class Controller :
         if mode == Controller.MODE_LAMP :
             color_name = self.config[mode]['color_name']
             color_spec = self.config['color_specs'][color_name]
-            logging.info("Setting lamp color to {}", color_name)
             self.lamp.set_colorspec(color_spec)
             self.scheduler.disable()
         if mode == Controller.MODE_SCHEDULER :
             schedules = self.config[mode]['schedules']
-            logging.info("Setting schedules to {}", schedules)
             self.clear(5)
             self.scheduler.set_schedules(schedules)
             self.scheduler.enable()
@@ -94,10 +92,22 @@ class Controller :
         self.lamp.set_rgb(rgb)
         logging.info("Color set to {}", rgb)
 
-    def set_colorspec(self, colorspec) :
+    def get_color(self) :
+        return self.lamp.get_state()
+
+    def set_colorspec(self, name, colorspec) :
         neolamp.lamp.ensure_colorspec(colorspec)
-        self.lamp.set_colorspec(colorspec)
-        logging.info("Lamp colorspec set to {}", colorspec)
+        self.config['color_specs'].update({name: colorspec})
+        logging.info("colorspec {} set", name)
+        self.save_config()
+
+    def delete_colorspec(self, name) :
+        if name in self.config['color_specs'] :
+            del self.config['color_specs'][name]
+            logging.info("colorspec {} deleted", name)
+            self.save_config()
+        else :
+            raise RuntimeError("No such colorspec: {}".format(name))
 
     def set_color_name(self, color_name) :
         assert color_name in self.config['color_specs']
@@ -118,8 +128,10 @@ class Controller :
         if name in self.config[Controller.MODE_SCHEDULER]['schedules'] :
             del self.config[Controller.MODE_SCHEDULER]['schedules'][name]
             self.scheduler.set_schedules(self.config[Controller.MODE_SCHEDULER]['schedules'])
-            logging.info("Schedule removed: {}", name)
+            logging.info("Schedule deleted: {}", name)
             self.save_config()
+        else :
+            raise RuntimeError("No such schedule: {}".format(name))
     
     def save_config(self) :
         core.util.save_json(self.path, self.config)

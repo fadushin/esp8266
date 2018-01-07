@@ -130,14 +130,14 @@ class Handler:
     @staticmethod
     def extract_query(path):
         components = path.split("?")
+        query_params = {}
         if len(components) == 1:
-            return path, None
+            return path, query_params
         elif len(components) > 2:
             raise uhttpd.BadRequestException("Malformed path: {}".format(path))
         path_part = components[0]
         query_part = components[1]
         qparam_components = query_part.split("&")
-        query_params = {}
         for qparam_component in qparam_components:
             if qparam_component.strip() == '':
                 continue

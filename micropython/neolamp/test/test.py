@@ -70,16 +70,10 @@ def test(host, port=80, pin=2, num_pixels=1) :
         reset(client, pin, num_pixels)
         test_lamp_colors(client)
         test_schedule(client)
-        # test_colorspec(client)
+        test_colorspec(client)
     finally :
-        reset(client, pin, num_pixels)
-
-
-def reset(client, pin=2, num_pixels=1) :
-    print("Resetting ESP and setting pin to {} and num_pixels to {} ...".format(pin, num_pixels))
-    client.post("reset")
-    sleep_ms(10000)
-    client.post("np?pin={}&num_pixels={}".format(pin, num_pixels))
+        reset(client)
+        pass
 
 def test_lamp_colors(client) :
     print("Testing lamp colors ...")
@@ -90,10 +84,6 @@ def test_lamp_colors(client) :
             test_lamp_color(client, color)
     finally :
         set_mode(client, "off")
-
-
-def get_colors(client) :
-    return json.loads(client.get('config/color_specs')['body'].decode('UTF-8'))
 
 def test_schedule(client) :
     print("Testing schedule ...")
@@ -106,6 +96,30 @@ def test_schedule(client) :
         sleep_ms(60*1000)
     finally :
         set_mode(client, "off")
+
+def test_colorspec(client) :
+    print("Testing colorspec ...")
+    set_mode(client, "off")
+    colors = get_colors(client)
+    assert 'test' not in colors
+    try :
+        set_colorspec(client, 'test', create_test_colorspec())
+        assert 'test' in get_colors(client)
+        set_mode(client, "lamp")
+        test_lamp_color(client, 'test')
+    finally :
+        set_mode(client, "off")
+
+
+def reset(client, pin=2, num_pixels=1) :
+    print("Resetting ESP and setting pin to {} and num_pixels to {} ...".format(pin, num_pixels))
+    client.post("reset")
+    sleep_ms(10000)
+    client.post("np?pin={}&num_pixels={}".format(pin, num_pixels))
+
+
+def get_colors(client) :
+    return json.loads(client.get('config/color_specs')['body'].decode('UTF-8'))
 
 
 def create_schedule(colors) :
@@ -122,7 +136,7 @@ def create_schedule(colors) :
             },
             {
                 'time': create_time(secs + 30),
-                'color_name': colors[random.randrange(n)]
+                'color_name': "purple_haze" # colors[random.randrange(n)]
             },
             {
                 'time': create_time(secs + 60),
@@ -130,6 +144,7 @@ def create_schedule(colors) :
             }
         ]
     }
+
 
 def create_time(secs) :
     localtime = time.localtime(secs)
@@ -142,11 +157,37 @@ def create_time(secs) :
             's': s
     }
 
+
 def test_lamp_color(client, color) :
     print("Testing lamp color {} ...".format(color))
     client.post('lamp?color_name={}'.format(color))
     sleep_ms(5000)
 
+
+def set_colorspec(client, name, colorspec) :
+    client.post('colorspec?name={}'.format(name), headers={'content-type': 'application/json'}, body=json.dumps(colorspec).encode('UTF-8'))
+
+def create_test_colorspec() :
+    return {
+        'r': {
+            'm': 128,
+            'a': 64,
+            'p': 2,
+            'o': 0
+        },
+        'g': {
+            'm': 128,
+            'a': 64,
+            'p': 1.024,
+            'o': 2.132
+        },
+        'b': {
+            'm': 128,
+            'a': 64,
+            'p': 4.231,
+            'o': 0.914
+        }
+    }
 
 def set_mode(client, mode) :
     client.post('mode?mode={}'.format(mode))

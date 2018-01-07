@@ -62,6 +62,16 @@ class Lamp(core.task.TaskBase) :
         self.prev_rgb = None
         self.verbose = verbose
     
+    def get_state(self):
+        data = []
+        for i in range(self.np.n) :
+            data.append({
+                "r": self.np[i][0],
+                "g": self.np[i][1],
+                "b": self.np[i][2]
+            })
+        return data
+
     def set_colorspec(self, color_spec) :
         self.color_spec = color_spec
 

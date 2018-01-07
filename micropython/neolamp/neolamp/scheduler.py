@@ -83,10 +83,11 @@ class Scheduler(core.task.TaskBase) :
 
     def perform(self) :
         localtime = self.get_localtime()
-        seq_pair = self.current_seq_pair(localtime)
+        secs = self.secs_since_midnight(localtime)
+        (_year, _month, _mday, _hour, _minute, _second, wday, _yday) = localtime
+        seq_pair = self.current_seq_pair(secs, wday + 1)
         if seq_pair :
             (prv, nxt) = seq_pair
-            secs = self.midnight_epoch_secs(localtime)
             interpolated = self.interpolate_colorspec(prv, nxt, secs)
             self.lamp.set_colorspec(interpolated)
             if self.verbose :
@@ -106,26 +107,44 @@ class Scheduler(core.task.TaskBase) :
         secs += self.tzd.get_offset_hours() * 60 * 60
         return utime.localtime(secs)
 
-    def current_seq_pair(self, localtime) :
-        (year, month, mday, hour, minute, second, wday, yday) = localtime
-        secs = self.secs_since_midnight(localtime)
-        dow = wday + 1
+    def current_seq_pair(self, secs, dow) :
         for (schedule_name, schedule) in self.schedules.items() :
             if dow in schedule['dow'] :
-                first = None
-                for seq in schedule['seq'] :
-                    if Scheduler.get_secs(seq['time']) <= secs :
-                        first = seq
-                    elif first and secs < Scheduler.get_secs(seq['time']) :
-                        if self.current_schedule_name != schedule_name :
-                            logging.info("Entering schedule {}", schedule_name)
-                            self.current_schedule_name = schedule_name
-                        return (first, seq)
+                seq = schedule['seq']
+                i = Scheduler.find_index_in_range(secs, seq)
+                if i == -1 :
+                    return None
+                else :
+                    if self.current_schedule_name != schedule_name :
+                        logging.info("Entering schedule {}", schedule_name)
+                        self.current_schedule_name = schedule_name
+                    return (seq[i], seq[i+1])
         if self.current_schedule_name :
             logging.info("Leaving schedule {}", self.current_schedule_name)
+            self.current_schedule_name = None
             # set last here?
-        self.current_schedule_name = None
         return None
+
+    @staticmethod
+    def find_index_in_range(secs, seq) :
+        n = len(seq)
+        for i in range(n) :
+            seq_i = seq[i]
+            seq_i_secs = Scheduler.get_secs(seq_i['time'])
+            if secs < seq_i_secs :
+                return -1
+            elif i < n - 1 : # and seq_i <= secs
+                seq_iplus1 = seq[i+1]
+                seq_iplus1_secs = Scheduler.get_secs(seq_iplus1['time'])
+                if secs < seq_iplus1_secs :
+                    return i
+            i += 1
+        return -1
+
+    @staticmethod
+    def secs_since_midnight(localtime) :
+        secs = utime.mktime(localtime)
+        return secs - Scheduler.midnight_epoch_secs(localtime)
 
     @staticmethod
     def midnight_epoch_secs(localtime) :
@@ -133,9 +152,8 @@ class Scheduler(core.task.TaskBase) :
         return utime.mktime((year, month, mday, 0, 0, 0, wday, yday))
 
     @staticmethod
-    def secs_since_midnight(localtime) :
-        secs = utime.mktime(localtime)
-        return secs - Scheduler.midnight_epoch_secs(localtime)
+    def get_secs(time) :
+        return time["h"]*60*60 + time["m"]*60 + time["s"]
 
     def interpolate_colorspec(self, prv, nxt, x) :
         x1 = Scheduler.get_secs(prv['time'])
@@ -164,10 +182,6 @@ class Scheduler(core.task.TaskBase) :
                 'o': Scheduler.interpolate(x, span_x, x1, x2, prv_color['b']['o'], nxt_color['b']['o'])
             }
         }
-
-    @staticmethod
-    def get_secs(time) :
-        return time["h"]*60*60 + time["m"]*60 + time["s"]
 
     @staticmethod
     def interpolate(x, span_x, x1, x2, y1, y2) :
