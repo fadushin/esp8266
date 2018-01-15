@@ -202,7 +202,7 @@ class Server:
                 'protocol': ra[2]
             }
         except:
-            raise BadRequestException()
+            raise BadRequestException("Error splitting parsing heading into verb path protocol")
 
     @staticmethod
     def parse_header(line):
