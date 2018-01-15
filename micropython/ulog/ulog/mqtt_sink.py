@@ -24,32 +24,37 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-import usyslog
-import ulog
+import mqtt.simple
+import ujson
 
 class Sink :
     
     def __init__(self, config) :
+        name = config['name'] if 'name' in config else 'esp8266'
         host = config['host']
-        port = config['port'] if 'port' in config else 514
-        ## TODO add support for the facility
-        self._client = usyslog.UDPClient(host, port)
+        port = config['port'] if 'port' in config else 0
+        self.retries = config['retries'] if 'retries' in config else 1
+        self.retain = config['retain'] if 'retain' in config else False
+        self.qos = config['qos'] if 'qos' in config else 0
+        self.topic = config['topic'] if 'topic' in config else 'log'
+        self.client = mqtt.simple.MQTTClient(client_id=name, server=host, port=port)
 
     def log(self, message) :
-        level = message['level']
-        text = "[{}] {}: {}".format(
-            level, 
-            message['name'], 
-            message['message']
-        )
-        if level == ulog.Log.DEBUG :
-            self._client.debug(text)
-        elif level == ulog.Log.INFO :
-            self._client.info(text)
-        elif level == ulog.Log.WARNING :
-            self._client.warning(text)
-        elif level == ulog.Log.ERROR :
-            self._client.error(text)
-        else :
-            raise(Exception("Error: Unknown level: {}".format(level)))
+        msg = ujson.dumps(message)
+        for i in range(1 + self.retries) :
+            try :
+                self.try_connect()
+                self.client.publish(self.topic, msgretain=self.retain, qos=self.qos)
+                return
+            except Exception as e :
+                print("Error publishing to MQTT Server: {}".format(e))
+                self.connected = False
 
+    def try_connect() :
+        if not self.connected :
+            try :
+                self.client.connect()
+                self.connected = True
+            except Exception as e :
+                print("Error connecting to MQTT Server: {}".format(e))
+                self.connected = False
