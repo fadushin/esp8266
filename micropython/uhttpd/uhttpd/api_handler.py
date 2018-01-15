@@ -64,6 +64,8 @@ class Handler:
                 response = handler.post(api_request)
             elif verb == 'delete':
                 response = handler.delete(api_request)
+            elif verb == 'options':
+                response = handler.options(api_request)
             else:
                 # TODO add support for more verbs!
                 error_message = "Unsupported verb: {}".format(verb)
