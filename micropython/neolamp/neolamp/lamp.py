@@ -54,10 +54,13 @@ def ensure_numeric(val, lb=-0xFFFFFFFF, ub=0xFFFFFFFF) :
 
 class Lamp(core.task.TaskBase) :
 
-    def __init__(self, pin, num_pixels, color_spec, sleep_ms=100, verbose=False) :
+    def __init__(self, pin, num_pixels, colorspec, sleep_ms=100, num_transitions = 10, verbose=False) :
         core.task.TaskBase.__init__(self, sleep_ms, verbose=verbose)
         self.np = neopixel.NeoPixel(machine.Pin(pin), num_pixels)
-        self.color_spec = color_spec
+        self.colorspec = colorspec
+        self.prev_colorspec = None
+        self.num_transitions = num_transitions
+        self.transition_i = 0
         self.initial_tick = None
         self.prev_rgb = None
         self.verbose = verbose
@@ -72,8 +75,11 @@ class Lamp(core.task.TaskBase) :
             })
         return data
 
-    def set_colorspec(self, color_spec) :
-        self.color_spec = color_spec
+    def set_colorspec(self, colorspec) :
+        if colorspec != self.prev_colorspec :
+            self.prev_colorspec = self.colorspec
+            self.colorspec = colorspec
+            self.transition_i = 1
 
     def set_np(self, pin, num_pixels) :
         self.np = neopixel.NeoPixel(machine.Pin(pin), num_pixels)
@@ -91,31 +97,65 @@ class Lamp(core.task.TaskBase) :
         current_tick = utime.ticks_ms()
         if not self.initial_tick :
             self.initial_tick = current_tick
-            pass
         else :
             x = utime.ticks_diff(current_tick, self.initial_tick)
             if x == 0 :
                 pass
-            else :
-                if 0 < x :
-                    rgb = self.get_color(x)
-                    if rgb != self.prev_rgb :
-                        if self.verbose :
-                            logging.info("Lamp: setting color to {} from x={}", rgb, x)
-                        self.fill_pixels(rgb)
-                        self.prev_rgb = rgb
-                else : # wrap around; start over
-                    logging.info("Lamp: tick wrap")
-                    self.initial_tick = current_tick
+            elif 0 < x :
+                rgb = self.get_color(x)
+                if rgb != self.prev_rgb :
+                    if self.verbose :
+                        logging.info("Lamp: setting color to {} from x={}", rgb, x)
+                    self.fill_pixels(rgb)
+                    self.prev_rgb = rgb
+            else : # wrap around; start over
+                logging.info("Lamp: tick wrap")
+                self.initial_tick = current_tick
         return True
 
     def get_color(self, x) :
+        if self.prev_colorspec :
+            colorspec = Lamp.get_transition(self.prev_colorspec, self.transition_i, self.num_transitions, self.colorspec)
+            self.transition_i += 1
+            if self.transition_i >= self.num_transitions :
+                self.prev_colorspec = None
+                self.transition_i = -1
+        else :
+            colorspec = self.colorspec
         rgb = (
-            Lamp.get_color_level(x, self.color_spec["r"]),
-            Lamp.get_color_level(x, self.color_spec["g"]),
-            Lamp.get_color_level(x, self.color_spec["b"])            
+            Lamp.get_color_level(x, colorspec["r"]),
+            Lamp.get_color_level(x, colorspec["g"]),
+            Lamp.get_color_level(x, colorspec["b"])            
         )
         return rgb
+    
+    
+    @staticmethod
+    def get_transition(prev_colorspec, i, n, colorspec) :
+        return {
+            'r': {
+                'm': Lamp.interpolate(i, n, prev_colorspec['r']['m'], colorspec['r']['m']),
+                'a': Lamp.interpolate(i, n, prev_colorspec['r']['a'], colorspec['r']['a']),
+                'p': Lamp.interpolate(i, n, prev_colorspec['r']['p'], colorspec['r']['p']),
+                'o': Lamp.interpolate(i, n, prev_colorspec['r']['o'], colorspec['r']['o'])
+            },
+            'g': {
+                'm': Lamp.interpolate(i, n, prev_colorspec['g']['m'], colorspec['g']['m']),
+                'a': Lamp.interpolate(i, n, prev_colorspec['g']['a'], colorspec['g']['a']),
+                'p': Lamp.interpolate(i, n, prev_colorspec['g']['p'], colorspec['g']['p']),
+                'o': Lamp.interpolate(i, n, prev_colorspec['g']['o'], colorspec['g']['o'])
+            },
+            'b': {
+                'm': Lamp.interpolate(i, n, prev_colorspec['b']['m'], colorspec['b']['m']),
+                'a': Lamp.interpolate(i, n, prev_colorspec['b']['a'], colorspec['b']['a']),
+                'p': Lamp.interpolate(i, n, prev_colorspec['b']['p'], colorspec['b']['p']),
+                'o': Lamp.interpolate(i, n, prev_colorspec['b']['o'], colorspec['b']['o'])
+            }
+        }
+
+    @staticmethod
+    def interpolate(i, n, y1, y2) :
+        return y1 + int((i/n)*(y2 - y1))
         
     @staticmethod
     def get_color_level(x, mapo) :

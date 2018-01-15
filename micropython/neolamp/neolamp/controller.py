@@ -25,6 +25,7 @@
 #
 
 import os
+import utime
 
 import uasyncio
 import logging
@@ -53,6 +54,7 @@ class Controller :
         self.clear()
         self.scheduler = neolamp.scheduler.Scheduler(self.lamp, self.tzd, [], self.config['color_specs']).register()
         self.set_mode(self.config['mode'], init=True)
+        self.start_ms = utime.ticks_ms()
     
     def set_np(self, pin=None, num_pixels=None) :
         if pin or num_pixels :
@@ -153,7 +155,8 @@ class Controller :
             'gcd': self.gcd.stats(),
             'ntpd': self.ntpd.stats(),
             'lamp': self.lamp.stats(),
-            'scheduler': self.scheduler.stats()
+            'scheduler': self.scheduler.stats(),
+            'uptime_ms': utime.ticks_diff(utime.ticks_ms(), self.start_ms)
         }
             
     def clear(self, num_calls=5) :

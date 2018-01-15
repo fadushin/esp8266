@@ -124,25 +124,18 @@ def get_colors(client) :
 
 def create_schedule(colors) :
     colors.remove('black')
-    colors.remove('white')
+    colors.append('black')
     secs = time.time()
-    n = len(colors)
+    n = len(colors) 
+    seq = []
+    for i in range(n) :
+        seq.append({
+            'time': create_time(secs + 5*i + 5),
+            'color_name': colors[i]
+        })
     return {
         'dow': [time.localtime(secs).tm_wday + 1],
-        'seq': [
-            {
-                'time': create_time(secs),
-                'color_name': 'black'
-            },
-            {
-                'time': create_time(secs + 30),
-                'color_name': "purple_haze" # colors[random.randrange(n)]
-            },
-            {
-                'time': create_time(secs + 60),
-                'color_name': 'black'
-            }
-        ]
+        'seq': seq
     }
 
 

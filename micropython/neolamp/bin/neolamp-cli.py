@@ -26,6 +26,7 @@
 
 import http.client
 import time
+import datetime
 import json
 import random
 
@@ -287,14 +288,38 @@ class DeviceMenu(Menu) :
     def get_stats(client) :
         stats = json.loads(client.get("stats")['body'].decode('UTF-8'))
         gcd = stats['gcd']
-        print("Garbage collector (calls failures): {} {}".format(gcd['num_calls'], gcd['num_failures']))
-        ntpd = stats['ntpd']
-        print("NTP daemon (calls failures): {} {}".format(ntpd['num_calls'], ntpd['num_failures']))
-        lamp = stats['lamp']
-        print("Lamp (calls failures): {} {}".format(lamp['num_calls'], lamp['num_failures']))
-        scheduler = stats['scheduler']
-        print("Scheduler (calls failures): {} {}".format(scheduler['num_calls'], scheduler['num_failures']))
-
+        print("~~~")
+        print(DeviceMenu.get_basic_stats("GC", gcd))
+        print(DeviceMenu.get_basic_stats("NTP", stats['ntpd']))
+        print(DeviceMenu.get_basic_stats("Lamp", stats['lamp']))
+        print(DeviceMenu.get_basic_stats("Scheduler", stats['scheduler']))
+        print("~~~")
+        print("GC stats: max: {} min: {} avg: {}".format(gcd['max_collected'], gcd['min_collected'], int(gcd['sum_collected']/gcd['num_collections'])))
+        mem_alloc = gcd['mem_alloc']
+        mem_free = gcd['mem_free']
+        capacity = mem_alloc + mem_free
+        print("Memory: allocated: {} bytes free: {} bytes ({}%)".format(mem_alloc, mem_free, int(((capacity - mem_free) / capacity) * 100.0)))
+        (days, hours, minutes, seconds, millis) = DeviceMenu.get_duration(stats['uptime_ms'])
+        print("Uptime: {}d {}h {}m {}.{}s".format(days, hours, minutes, seconds, millis))
+        print("~~~")
+        
+    @staticmethod
+    def get_basic_stats(moniker, stats) :
+        return "{} task (calls failures avg_ms/call): {} {} {}".format(
+            moniker,
+            stats['num_calls'], 
+            stats['num_failures'], 
+            int((stats['ticks_us']/stats['num_calls'])/1000)
+        )
+    
+    @staticmethod
+    def get_duration(millis) :
+        s0, ms = divmod(millis, 1000)
+        m0, s = divmod(s0, 60)
+        h0, m = divmod(m0, 60)
+        d,  h = divmod(h0, 24)
+        return (d, h, m, s, ms)
+        
     @staticmethod
     def reboot(client) :
         client.post("reboot")

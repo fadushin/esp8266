@@ -77,23 +77,25 @@ class Scheduler(core.task.TaskBase) :
         self.color_specs = color_specs
         self.verbose = verbose
         self.current_schedule_name = None
+        self.current_seq = None
 
     def set_schedules(self, schedules) :
         self.schedules = schedules
 
     def perform(self) :
         localtime = self.get_localtime()
-        secs = self.secs_since_midnight(localtime)
+        secs = Scheduler.secs_since_midnight(localtime)
         (_year, _month, _mday, _hour, _minute, _second, wday, _yday) = localtime
-        seq_pair = self.current_seq_pair(secs, wday + 1)
-        if seq_pair :
-            (prv, nxt) = seq_pair
-            interpolated = self.interpolate_colorspec(prv, nxt, secs)
-            self.lamp.set_colorspec(interpolated)
-            if self.verbose :
-                logging.info("Interpolated colorspec: {}", interpolated)
+        seq = self.get_current_seq(secs, wday + 1)
+        if seq :
+            if seq != self.current_seq :
+                color_name = seq['color_name']
+                logging.info("Scheduler: Setting lamp color to {}", color_name)
+                self.lamp.set_colorspec(self.color_specs[color_name])
+                self.current_seq = seq
         else :
             self.lamp.set_colorspec(self.color_specs['black'])
+            self.current_seq = None
         return True
     
     
@@ -107,22 +109,19 @@ class Scheduler(core.task.TaskBase) :
         secs += self.tzd.get_offset_hours() * 60 * 60
         return utime.localtime(secs)
 
-    def current_seq_pair(self, secs, dow) :
+    def get_current_seq(self, secs, dow) :
         for (schedule_name, schedule) in self.schedules.items() :
             if dow in schedule['dow'] :
                 seq = schedule['seq']
                 i = Scheduler.find_index_in_range(secs, seq)
-                if i == -1 :
-                    return None
-                else :
+                if i != -1 :
                     if self.current_schedule_name != schedule_name :
                         logging.info("Entering schedule {}", schedule_name)
                         self.current_schedule_name = schedule_name
-                    return (seq[i], seq[i+1])
+                    return seq[i]
         if self.current_schedule_name :
             logging.info("Leaving schedule {}", self.current_schedule_name)
             self.current_schedule_name = None
-            # set last here?
         return None
 
     @staticmethod
@@ -154,41 +153,3 @@ class Scheduler(core.task.TaskBase) :
     @staticmethod
     def get_secs(time) :
         return time["h"]*60*60 + time["m"]*60 + time["s"]
-
-    def interpolate_colorspec(self, prv, nxt, x) :
-        x1 = Scheduler.get_secs(prv['time'])
-        x2 = Scheduler.get_secs(nxt['time'])
-        span_x = x2 - x1
-        # assert span_x > 0
-        prv_color = self.color_specs[prv['color_name']]
-        nxt_color = self.color_specs[nxt['color_name']]
-        return {
-            'r': {
-                'p': Scheduler.interpolate(x, span_x, x1, x2, prv_color['r']['p'], nxt_color['r']['p']),
-                'a': Scheduler.interpolate(x, span_x, x1, x2, prv_color['r']['a'], nxt_color['r']['a']),
-                'm': Scheduler.interpolate(x, span_x, x1, x2, prv_color['r']['m'], nxt_color['r']['m']),
-                'o': Scheduler.interpolate(x, span_x, x1, x2, prv_color['r']['o'], nxt_color['r']['o'])
-            },
-            'g': {
-                'p': Scheduler.interpolate(x, span_x, x1, x2, prv_color['g']['p'], nxt_color['g']['p']),
-                'a': Scheduler.interpolate(x, span_x, x1, x2, prv_color['g']['a'], nxt_color['g']['a']),
-                'm': Scheduler.interpolate(x, span_x, x1, x2, prv_color['g']['m'], nxt_color['g']['m']),
-                'o': Scheduler.interpolate(x, span_x, x1, x2, prv_color['g']['o'], nxt_color['g']['o'])
-            },
-            'b': {
-                'p': Scheduler.interpolate(x, span_x, x1, x2, prv_color['b']['p'], nxt_color['b']['p']),
-                'a': Scheduler.interpolate(x, span_x, x1, x2, prv_color['b']['a'], nxt_color['b']['a']),
-                'm': Scheduler.interpolate(x, span_x, x1, x2, prv_color['b']['m'], nxt_color['b']['m']),
-                'o': Scheduler.interpolate(x, span_x, x1, x2, prv_color['b']['o'], nxt_color['b']['o'])
-            }
-        }
-
-    @staticmethod
-    def interpolate(x, span_x, x1, x2, y1, y2) :
-        if y1 < y2 :
-            return y1 + int(math.sin(math.pi/2 *      (x - x1)/span_x)  * (y2 - y1))
-        elif y1 > y2 :
-            return y2 + int(math.sin(math.pi/2 * (1 + (x - x1)/span_x)) * (y1 - y2))
-        else : ## y1 == y2
-            return y1
-
