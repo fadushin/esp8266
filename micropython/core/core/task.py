@@ -23,9 +23,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
+import utime
+import sys
 import uasyncio
 import logging
-import sys
 import core.util
 
 
@@ -45,6 +46,7 @@ class TaskBase :
         self.num_calls = 0
         self.num_failures = 0
         self.last_retry_ms = None
+        self.ticks_us = 0
 
     def register(self) :
         loop = uasyncio.get_event_loop()
@@ -67,7 +69,8 @@ class TaskBase :
     def stats(self) :
         return {
             'num_calls': self.num_calls,
-            'num_failures': self.num_failures
+            'num_failures': self.num_failures,
+            'ticks_us': self.ticks_us
         }
 
     def perform(self) :
@@ -80,7 +83,9 @@ class TaskBase :
             if not self.disabled :
                 try :
                     self.num_calls += 1
+                    start_ticks_us = utime.ticks_us()
                     result = self.perform()
+                    self.ticks_us += utime.ticks_diff(utime.ticks_us(), start_ticks_us)
                     if not result:
                         return
                     self.last_retry_ms = None
